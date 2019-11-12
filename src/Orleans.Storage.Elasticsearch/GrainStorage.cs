@@ -14,7 +14,7 @@ namespace Orleans.Storage.Elasticsearch
 
         public async Task ClearStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
-             var id = this.GetPrimaryKeyObject(grainReference).ToString();
+            var id = this.GetPrimaryKeyObject(grainReference).ToString();
             await this.GetRepository(grainState).ClearAsync(id);
         }
 
@@ -49,13 +49,9 @@ namespace Orleans.Storage.Elasticsearch
             if (key != null)
                 return key;
             if (addressable.IsPrimaryKeyBasedOnLong())
-            {
-                var key1 = addressable.GetPrimaryKeyLong();
-                if (key1 > 0)
-                    return key1;
-            }
-            return addressable.GetPrimaryKey();
-
+                return addressable.GetPrimaryKeyLong();
+            else
+                return addressable.GetPrimaryKey();
         }
     }
 }
