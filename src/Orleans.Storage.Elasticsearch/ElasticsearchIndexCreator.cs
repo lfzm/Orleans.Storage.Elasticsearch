@@ -25,7 +25,7 @@ namespace Orleans.Storage.Elasticsearch
         public void Add<TModel>(string indexName)
             where TModel : class
         {
-            this.createIndexFuncList.Add((client) => this.Create<TModel>(client,indexName));
+            this.createIndexFuncList.Add((client) => this.Create<TModel>(client, indexName));
         }
 
         /// <summary>
@@ -46,13 +46,18 @@ namespace Orleans.Storage.Elasticsearch
                 if (r.Result.IsValid)
                     return;
 
-                if(response.TryGetServerErrorReason(out var reason))
+                if (response.TryGetServerErrorReason(out var reason))
                 {
-                    throw new Exception(reason);
+                    throw new Exception(response.ServerError.Status + reason);
+                }
+                else if (response.OriginalException != null)
+                {
+                    throw response.OriginalException;
                 }
                 else
                 {
-                    throw new Exception("Create Elasticsearch index failed");
+                    throw new Exception($"Create Elasticsearch index failed");
+
                 }
             });
 
@@ -61,7 +66,7 @@ namespace Orleans.Storage.Elasticsearch
         private async Task<ICreateIndexResponse> Create<TModel>(IElasticClient client, string indexName)
              where TModel : class
         {
-            var response =await client.GetIndexAsync(indexName);
+            var response = await client.GetIndexAsync(indexName);
             if (!response.IsValid)
             {
                 return await client.CreateIndexAsync(indexName, c => c.Mappings(ms => ms.Map<TModel>(m => m.AutoMap())));
