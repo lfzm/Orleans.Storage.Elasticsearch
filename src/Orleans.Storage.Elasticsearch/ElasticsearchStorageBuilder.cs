@@ -14,7 +14,6 @@ namespace Orleans.Storage.Elasticsearch
         public IServiceCollection Service { get; }
         private readonly ElasticsearchIndexCreator creator;
 
-
         /// <summary>
         /// Elasticsearch 连接配置
         /// </summary>
@@ -75,6 +74,7 @@ namespace Orleans.Storage.Elasticsearch
 
         public void Build()
         {
+            this.Service.AddSingleton<ElasticsearchResponseFailedHandle>();
             this.Service.AddSingletonNamedService<IElasticClient>(this.StorageName, (sp, key) =>
             {
                 var client = new ElasticClient(Settings);

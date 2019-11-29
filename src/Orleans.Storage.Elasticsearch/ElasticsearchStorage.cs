@@ -1,4 +1,6 @@
-﻿using Nest;
+﻿using Microsoft.Extensions.DependencyInjection;
+using Nest;
+using Orleans.Storage.Elasticsearch.Compensate;
 using System;
 using System.Threading.Tasks;
 
@@ -15,46 +17,60 @@ namespace Orleans.Storage.Elasticsearch
             this.ServiceProvider = serviceProvider;
         }
 
-        public async Task ClearAsync(string id)
+        public async Task<bool> ClearAsync(string id)
         {
             var response = await this.DeleteAsync(id);
             if (response.IsValid)
-                return;
+                return true;
             else
             {
-                if (response.TryGetServerErrorReason(out var reason))
-                    throw new Exception(reason);
-                else
+                // response filed handle
+                this.ServiceProvider.GetRequiredService<ElasticsearchResponseFailedHandle>().Handle(response);
+                // Data compensation
+                if (this.EnsureReminderServiceRegistered())
                 {
-                    throw new Exception("Requesting ES failed");
+                    await this.ServiceProvider.GetRequiredService<IGrainFactory>()
+                        .GetGrain<ICompensateGrain>(typeof(TEntity).FullName)
+                        .WriteAsync(id, CompensateType.Clear);
                 }
+                return false;
             }
         }
         public async Task<object> ReadAsync(string id)
         {
             return await this.QueryAsync(id);
         }
-        public async Task<object> WriteAsync(object obj)
+        public async Task<object> WriteAsync(string id, object obj)
         {
             if (obj is TEntity entity)
             {
                 var response = await this.IndexAsync(entity);
-                if (response.IsValid)
-                    return obj;
-                else
+                if (!response.IsValid)
                 {
-                    if (response.TryGetServerErrorReason(out var reason))
-                        throw new Exception(reason);
-                    else
+                    // response filed handle
+                    this.ServiceProvider.GetRequiredService<ElasticsearchResponseFailedHandle>().Handle(response);
+                    // Data compensation
+                    if (this.EnsureReminderServiceRegistered())
                     {
-                        throw new Exception("Requesting ES failed");
+                        await this.ServiceProvider.GetRequiredService<IGrainFactory>()
+                            .GetGrain<ICompensateGrain>(typeof(TEntity).FullName)
+                            .WriteAsync(id, CompensateType.Write);
                     }
                 }
+                return obj;
             }
             else
                 throw new Exception($"WriteAsync：entity is not the same type as {typeof(TEntity).Name}");
         }
 
+        private bool EnsureReminderServiceRegistered()
+        {
+            var reminderTable = this.ServiceProvider.GetService<IReminderTable>();
+            if (reminderTable == null)
+                return false;
+            else
+                return true;
+        }
         public abstract Task<IIndexResponse> IndexAsync(TEntity entity);
 
         public abstract Task<TEntity> QueryAsync(string id);
@@ -67,6 +83,9 @@ namespace Orleans.Storage.Elasticsearch
 
     public class ElasticsearchStorage
     {
+        /// <summary>
+        /// 默认 Elasticsearch 存储
+        /// </summary>
         public const string DefaultName = "ElasticsearchStorage";
     }
 }

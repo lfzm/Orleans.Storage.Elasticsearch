@@ -19,9 +19,10 @@ namespace Orleans.Storage.Elasticsearch
         /// <summary>
         /// 写入存储
         /// </summary>
+        /// <param name="id">标识Id</param>
         /// <param name="entity"></param>
         /// <returns></returns>
-        Task<object> WriteAsync(object obj);
+        Task<object> WriteAsync(string id,object obj);
         /// <summary>
         /// 刷新存储
         /// </summary>
@@ -33,6 +34,6 @@ namespace Orleans.Storage.Elasticsearch
         /// </summary>
         /// <param name="id">实体 id</param>
         /// <returns></returns>
-        Task ClearAsync(string id);
+        Task<bool> ClearAsync(string id);
     }
 }
