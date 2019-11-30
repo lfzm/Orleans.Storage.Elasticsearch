@@ -22,7 +22,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="id">标识Id</param>
         /// <param name="entity"></param>
         /// <returns></returns>
-        Task<object> WriteAsync(string id,object obj);
+        Task<bool> WriteAsync(string id,object obj);
         /// <summary>
         /// 刷新存储
         /// </summary>

@@ -40,7 +40,7 @@ namespace Orleans.Storage.Elasticsearch
         {
             return await this.QueryAsync(id);
         }
-        public async Task<object> WriteAsync(string id, object obj)
+        public async Task<bool> WriteAsync(string id, object obj)
         {
             if (obj is TEntity entity)
             {
@@ -56,8 +56,10 @@ namespace Orleans.Storage.Elasticsearch
                             .GetGrain<ICompensateGrain>(typeof(TEntity).FullName)
                             .WriteAsync(id, CompensateType.Write);
                     }
+                    return false;
                 }
-                return obj;
+                else
+                    return true;
             }
             else
                 throw new Exception($"WriteAsync：entity is not the same type as {typeof(TEntity).Name}");
@@ -71,14 +73,12 @@ namespace Orleans.Storage.Elasticsearch
             else
                 return true;
         }
+
+
         public abstract Task<IIndexResponse> IndexAsync(TEntity entity);
-
         public abstract Task<TEntity> QueryAsync(string id);
-
         public abstract Task<IDeleteResponse> DeleteAsync(string id);
-
         public abstract Task<bool> RefreshAsync(string id);
-
     }
 
     public class ElasticsearchStorage

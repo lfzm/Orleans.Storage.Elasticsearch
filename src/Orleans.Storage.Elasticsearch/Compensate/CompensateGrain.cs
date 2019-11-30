@@ -62,7 +62,6 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                     return;
                 }
             }
-
             if (reminder == null)
                 reminder = await this.GetReminder(reminderName);
             if (reminder != null)

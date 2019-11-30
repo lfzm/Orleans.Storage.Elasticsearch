@@ -27,7 +27,7 @@ namespace Orleans.Storage.Elasticsearch
         public async Task WriteStateAsync(string grainType, GrainReference grainReference, IGrainState grainState)
         {
             var id = this.GetPrimaryKeyObject(grainReference).ToString();
-            grainState.State = await this.GetRepository(grainState).WriteAsync(id,grainState.State);
+            await this.GetRepository(grainState).WriteAsync(id,grainState.State);
         }
 
         private IElasticsearchStorage GetRepository(IGrainState grainState)
