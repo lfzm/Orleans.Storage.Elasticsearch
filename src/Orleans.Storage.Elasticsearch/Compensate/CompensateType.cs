@@ -4,10 +4,9 @@ using System.Text;
 
 namespace Orleans.Storage.Elasticsearch.Compensate
 {
-
     public enum CompensateType
     {
-        Write,
-        Clear
+        Write=1,
+        Clear=0
     }
 }

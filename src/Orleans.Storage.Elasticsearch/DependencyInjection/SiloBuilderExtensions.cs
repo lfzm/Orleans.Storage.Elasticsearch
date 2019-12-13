@@ -15,12 +15,13 @@ namespace Orleans.Hosting
         /// <param name="build"><see cref="ISiloBuilder"/></param>
         /// <param name="storageName">storage Name</param>
         /// <returns></returns>
-        public static ISiloBuilder AddElasticsearchStorage(this ISiloBuilder build, Action<IElasticsearchStorageBuilder> builer, string storageName = ElasticsearchStorage.DefaultName)
+        public static ISiloBuilder AddElasticsearchStorage(this ISiloBuilder build, Action<IElasticsearchStorageBuilder> buildAction, string storageName = ElasticsearchStorage.DefaultName)
         {
             build.ConfigureServices(services =>
             {
-                services.AddElasticsearchStorage(builer, storageName);
+                services.AddElasticsearchStorage(buildAction, storageName);
             });
+            build.AddStartupTask<SiloBuilderStartup>();
             return build;
         }
 
@@ -30,12 +31,13 @@ namespace Orleans.Hosting
         /// <param name="build"><see cref="ISiloBuilder"/></param>
         /// <param name="storageName">storage Name</param>
         /// <returns></returns>
-        public static ISiloHostBuilder AddElasticsearchStorage(this ISiloHostBuilder build, Action<IElasticsearchStorageBuilder> builer, string storageName = ElasticsearchStorage.DefaultName)
+        public static ISiloHostBuilder AddElasticsearchStorage(this ISiloHostBuilder build, Action<IElasticsearchStorageBuilder> buildAction, string storageName = ElasticsearchStorage.DefaultName)
         {
             build.ConfigureServices(services =>
             {
-                services.AddElasticsearchStorage(builer, storageName);
+                services.AddElasticsearchStorage(buildAction, storageName);
             });
+            build.AddStartupTask<SiloBuilderStartup>();
             return build;
         }
 
@@ -49,7 +51,6 @@ namespace Orleans.Hosting
         public static IServiceCollection AddElasticsearchStorage(this IServiceCollection services, Action<IElasticsearchStorageBuilder> builer, string storageName = ElasticsearchStorage.DefaultName)
         {
             services.AddTransientNamedService<IGrainStorage, GrainStorage>(storageName);
-          
             var builder = new ElasticsearchStorageBuilder(services, storageName);
             builer.Invoke(builder);
             builder.Build();

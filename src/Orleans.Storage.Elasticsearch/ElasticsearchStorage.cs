@@ -1,91 +1,221 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Nest;
+using Orleans.Runtime;
 using Orleans.Storage.Elasticsearch.Compensate;
+using Orleans.Storage.Elasticsearch.Infrastructure;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 
 namespace Orleans.Storage.Elasticsearch
 {
-    public abstract class ElasticsearchStorage<TEntity> : IElasticsearchStorage
-        where TEntity : class
+    /// <summary>
+    /// Elasticsearch Storage
+    /// </summary>
+    /// <typeparam name="TModel">Elasticsearch 存储对象（有标记Mapping映射）</typeparam>
+    public class ElasticsearchStorage<TModel> : IElasticsearchStorage<TModel>
+        where TModel : class, IStorageModel
     {
-        private readonly IServiceProvider ServiceProvider;
-        public IElasticClient Client { get; set; }
+        private readonly IElasticsearchClient<TModel> _client;
+        private readonly IDataflowBufferBlock<TModel> _dataflowBuffer;
+        protected readonly IServiceProvider ServiceProvider;
+        protected readonly ElasticsearchStorageInfo _storageInfo;
+        protected readonly ISyncedStatusMarkProcessor _syncedMarkProcessor;
+        protected readonly ElasticsearchStorageOptions _options;
 
-        protected ElasticsearchStorage(IServiceProvider serviceProvider)
+        public ElasticsearchStorage(IServiceProvider serviceProvider, string indexName, IElasticsearchClient<TModel> client)
+            : this(serviceProvider, indexName)
+        {
+            this._client = client;
+            this._dataflowBuffer = new DataflowBufferBlock<TModel>(this.IndexMany);
+        }
+
+        public ElasticsearchStorage(IServiceProvider serviceProvider, string indexName)
         {
             this.ServiceProvider = serviceProvider;
+            this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(indexName);
+            this._syncedMarkProcessor = this.ServiceProvider.GetServiceByName<ISyncedStatusMarkProcessor>(indexName);
+            this._options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(this._storageInfo.StorageName);
         }
 
-        public async Task<bool> ClearAsync(string id)
+        public virtual Task<TModel> GetAsync(string id)
         {
-            var response = await this.DeleteAsync(id);
-            if (response.IsValid)
+            return _client.GetAsync(id);
+        }
+        public virtual Task<IEnumerable<TModel>> GetListAsync(IEnumerable<string> ids)
+        {
+            return _client.GetListAsync(ids);
+        }
+
+        public virtual async Task<bool> DeleteAsync(string id)
+        {
+            if (await this._client.DeleteAsync(id))
+            {
+                this._syncedMarkProcessor?.MarkSynced(id);
                 return true;
+            }
             else
             {
-                // response filed handle
-                this.ServiceProvider.GetRequiredService<ElasticsearchResponseFailedHandle>().Handle(response);
-                // Data compensation
-                if (this.EnsureReminderServiceRegistered())
-                {
-                    await this.ServiceProvider.GetRequiredService<IGrainFactory>()
-                        .GetGrain<ICompensateGrain>(typeof(TEntity).FullName)
-                        .WriteAsync(id, CompensateType.Clear);
-                }
+                await this.CompensateAsync(id, CompensateType.Clear); //数据补偿
                 return false;
             }
         }
-        public async Task<object> ReadAsync(string id)
+        public virtual async Task<bool> IndexAsync(TModel model)
         {
-            return await this.QueryAsync(id);
-        }
-        public async Task<bool> WriteAsync(string id, object obj)
-        {
-            if (obj is TEntity entity)
+            if (await this._dataflowBuffer.SendAsync(model))
             {
-                var response = await this.IndexAsync(entity);
-                if (!response.IsValid)
+                this._syncedMarkProcessor?.MarkSynced(model.GetPrimaryKey());
+                return true;
+            }
+            else
+            {
+                await this.CompensateAsync(model.GetPrimaryKey(), CompensateType.Write); //数据补偿
+                return false;
+            }
+        }
+        public virtual Task IndexManyAsync(IEnumerable<TModel> modelList)
+        {
+            var tasks = modelList.Select(f => this.IndexAsync(f));
+            Task.WaitAll(tasks.ToArray());
+            return Task.CompletedTask;
+        }
+        public virtual Task DeleteManyAsync(IEnumerable<string> ids)
+        {
+            var tasks = ids.Select(f => this.DeleteAsync(f));
+            Task.WaitAll(tasks.ToArray());
+            return Task.CompletedTask;
+        }
+        async Task<object> IElasticsearchStorage.GetAsync(string id)
+        {
+            return await this.GetAsync(id);
+        }
+        async Task<IEnumerable<object>> IElasticsearchStorage.GetListAsync(IEnumerable<string> ids)
+        {
+            return await this.GetListAsync(ids);
+        }
+        public virtual Task<bool> IndexAsync(object model)
+        {
+            if (model is TModel d)
+                return this.IndexAsync(d);
+            else
+                throw new Exception($"{model.GetType().FullName} must be of type {typeof(TModel).FullName}");
+        }
+        public virtual Task IndexManyAsync(IEnumerable<object> modelList)
+        {
+            var datas = modelList.Select(data =>
+            {
+                if (data is TModel d)
                 {
-                    // response filed handle
-                    this.ServiceProvider.GetRequiredService<ElasticsearchResponseFailedHandle>().Handle(response);
-                    // Data compensation
-                    if (this.EnsureReminderServiceRegistered())
-                    {
-                        await this.ServiceProvider.GetRequiredService<IGrainFactory>()
-                            .GetGrain<ICompensateGrain>(typeof(TEntity).FullName)
-                            .WriteAsync(id, CompensateType.Write);
-                    }
-                    return false;
+                    return d;
                 }
                 else
-                    return true;
-            }
-            else
-                throw new Exception($"WriteAsync：entity is not the same type as {typeof(TEntity).Name}");
+                    throw new Exception($"{data.GetType().FullName} must be of type {typeof(TModel).FullName}");
+            });
+            return this.IndexManyAsync(datas);
         }
-
-        private bool EnsureReminderServiceRegistered()
+        public virtual async Task IndexMany(BufferBlock<IDataflowBufferWrap<TModel>> bufferBlock)
         {
-            var reminderTable = this.ServiceProvider.GetService<IReminderTable>();
-            if (reminderTable == null)
-                return false;
+            List<IDataflowBufferWrap<TModel>> modelWraps = new List<IDataflowBufferWrap<TModel>>();
+            while (bufferBlock.TryReceive(out var wrap))
+            {
+                // 一次操作数据不能超过配置限制
+                if (modelWraps.Count > this._options.IndexManyMaxCount)
+                    break;
+                modelWraps.Add(wrap);
+            }
+            var docs = modelWraps.Select(f =>
+            {
+                if (f.Data is IStorageConcurrencyModel model)
+                    return new ElasticsearchDocument<TModel>(f.Data, f.Data.GetPrimaryKey(), model.GetVersionNo());
+                else
+                    return new ElasticsearchDocument<TModel>(f.Data, f.Data.GetPrimaryKey());
+            });
+            var response = await this._client.IndexManyAsync(docs);
+            if (response.IsValid)
+                modelWraps.ForEach(f => f.CompleteHandler(true));// 执行成功全部返回成功
             else
-                return true;
+            {
+                // 部分执行失败，检查是否成功并且返回
+                modelWraps.ForEach(w =>
+                {
+                    string id = w.Data.GetPrimaryKey();
+                    var r = response.Items.FirstOrDefault(f => f.Id == id);
+                    if (!r.IsValid)
+                    {
+                        // 如果有版本冲突，默认成功执行
+                        if (r.Status == 409 && r.Error.Reason.Contains("version conflict"))
+                        {
+                            w.CompleteHandler(true);
+                            return;
+                        }
+                    }
+                    w.CompleteHandler(r.IsValid);
+                });
+            }
         }
+        protected async Task CompensateAsync(string id, CompensateType type)
+        {
+            if (!this._storageInfo.CompleteCheck)
+                return;
+            var reminderTable = this.ServiceProvider.GetService<IReminderTable>();
+            if (reminderTable != null)
+            {
+                await this.ServiceProvider.GetRequiredService<IGrainFactory>()
+                         .GetGrain<ICompensater>(this._storageInfo.IndexName)
+                         .CompensateAsync(new CompensateData(id, type));
+            }
+        }
+        async Task<bool> IElasticsearchStorage.RefreshAsync(string id)
+        {
+            // 调用补偿仓储获取数据
+            var model = await this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>().GetAsync(id);
+            if (model == null)
+                return false;
+            // 更新到Elasticsearch中去
+            return await this.IndexAsync(model);
+        }
+        async Task<int> IElasticsearchStorage.CompensateSync()
+        {
+            // 调用补偿仓储获取
+            var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
+            var dataList = await storage.GetWaitingSyncAsync(this._options.CompleteCheckOnceCount);
+            if (dataList == null || dataList.Count() == 0)
+                return int.MinValue;
 
+            // 获取es是否已经同步
+            var versions = await this._client.GetVersionListAsync(dataList.Select(f => f.Id));
+            var waitSyncIds = dataList.Where(f =>
+            {
+                if (versions.ContainsKey(f.Id))
+                {
+                    // 版本相同情况下无需补偿
+                    if (versions[f.Id] == f.Version)
+                        return false;
+                }
+                return true;
+            }).Select(f => f.Id);
 
-        public abstract Task<IIndexResponse> IndexAsync(TEntity entity);
-        public abstract Task<TEntity> QueryAsync(string id);
-        public abstract Task<IDeleteResponse> DeleteAsync(string id);
-        public abstract Task<bool> RefreshAsync(string id);
+            // 获取所有待补偿的数据
+            var models = await storage.GetListAsync(waitSyncIds);
+            await this.IndexManyAsync(models);
+
+            // 等待全部标记完成
+            await this._syncedMarkProcessor.WaitMarkComplete();
+            return models.Count();
+        }
+        async Task<object> IElasticsearchStorage.GetToDbAsync(string Id)
+        {
+            var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
+            return await storage.GetAsync(Id);
+        }
     }
-
     public class ElasticsearchStorage
     {
         /// <summary>
         /// 默认 Elasticsearch 存储
         /// </summary>
         public const string DefaultName = "ElasticsearchStorage";
+
     }
 }

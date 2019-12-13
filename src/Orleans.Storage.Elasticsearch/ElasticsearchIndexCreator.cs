@@ -18,27 +18,15 @@ namespace Orleans.Storage.Elasticsearch
         }
 
         /// <summary>
-        /// 添加需要创建的索引
-        /// </summary>
-        /// <typeparam name="TModel">Mapper</typeparam>
-        /// <param name="indexName">索引名称</param>
-        public void Add<TModel>(string indexName)
-            where TModel : class
-        {
-            this.createIndexFuncList.Add((client) => this.Create<TModel>(client, indexName));
-        }
-
-        /// <summary>
         /// 创建所有索引
         /// </summary>
-        public void Create()
+        public void Create(List<ElasticsearchStorageInfo> storageInfos)
         {
             var client = new ElasticClient(builder.Settings);
-
-            var results = createIndexFuncList.Select(i => i.Invoke(client)).ToList();
-            Task.WaitAll(results.ToArray());
+            var results = storageInfos.Select(f => this.Create(client, f.IndexName, f.DocumentType)).ToArray();
+            Task.WaitAll(results);
             //验证创建结果
-            results.ForEach(r =>
+            results.ToList().ForEach(r =>
             {
                 var response = r.Result;
                 if (response == null)
@@ -57,19 +45,20 @@ namespace Orleans.Storage.Elasticsearch
                 else
                 {
                     throw new Exception($"Create Elasticsearch index failed");
-
                 }
             });
 
         }
 
-        private async Task<ICreateIndexResponse> Create<TModel>(IElasticClient client, string indexName)
-             where TModel : class
+        private async Task<ICreateIndexResponse> Create(IElasticClient client, string indexName, Type mapper)
         {
             var response = await client.GetIndexAsync(indexName);
             if (!response.IsValid)
             {
-                return await client.CreateIndexAsync(indexName, c => c.Mappings(ms => ms.Map<TModel>(m => m.AutoMap())));
+                return await client.CreateIndexAsync(indexName, c =>
+                {
+                    return c.Mappings(ms => ms.Map(TypeName.Create(mapper), m => m.AutoMap(mapper)));
+                });
             }
             else
                 return null;

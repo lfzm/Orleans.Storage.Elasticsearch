@@ -1,39 +1,37 @@
 ﻿using Nest;
-using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Storage.Elasticsearch
 {
+    /// <summary>
+    /// Elasticsearch 存储器
+    /// </summary>
+    /// <typeparam name="TModel"></typeparam>
+    public interface IElasticsearchStorage<TModel> : IElasticsearchStorage
+        where TModel : IStorageModel
+    {
+        new Task<TModel> GetAsync(string id);
+        new Task<IEnumerable<TModel>> GetListAsync(IEnumerable<string> ids);
+        Task<bool> IndexAsync(TModel data);
+        Task IndexManyAsync(IEnumerable<TModel> modelList);
+
+    }
+    /// <summary>
+    /// Elasticsearch 存储器
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
     public interface IElasticsearchStorage
     {
-        /// <summary>
-        /// ElasticSearch客户端
-        /// </summary>
-        IElasticClient Client { get; set; }
-        /// <summary>
-        /// 读取存储
-        /// </summary>
-        /// <param name="id">标识Id</param>
-        /// <returns></returns>
-        Task<object> ReadAsync(string id);
-        /// <summary>
-        /// 写入存储
-        /// </summary>
-        /// <param name="id">标识Id</param>
-        /// <param name="entity"></param>
-        /// <returns></returns>
-        Task<bool> WriteAsync(string id,object obj);
-        /// <summary>
-        /// 刷新存储
-        /// </summary>
-        /// <param name="id">实体 id</param>
-        /// <returns></returns>
-        Task<bool> RefreshAsync(string id);
-        /// <summary>
-        /// 删除存储
-        /// </summary>
-        /// <param name="id">实体 id</param>
-        /// <returns></returns>
-        Task<bool> ClearAsync(string id);
+        Task<object> GetAsync(string id);
+        Task<IEnumerable<object>> GetListAsync(IEnumerable<string> ids);
+        Task<bool> IndexAsync(object model);
+        Task IndexManyAsync(IEnumerable<object> modelList);
+        Task DeleteManyAsync(IEnumerable<string> ids);
+        Task<bool> DeleteAsync(string id);
+
+        internal Task<bool> RefreshAsync(string id);
+        internal Task<int> CompensateSync();
+        internal Task<object> GetToDbAsync(string Id);
     }
 }
