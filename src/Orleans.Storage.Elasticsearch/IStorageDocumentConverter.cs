@@ -9,7 +9,7 @@ namespace Orleans.Storage.Elasticsearch
     {
         TDocument ToDocument<TDocument, TModel>(TModel model);
         TModel ToModel<TModel, TDocument>(TDocument document);
-        IEnumerable<TDocument> ToDocumentList<TDocument, TModel>(IEnumerable<TModel> model);
-        IEnumerable<TModel> ToModelList<TModel, TDocument>(IEnumerable<TDocument> document);
+        IEnumerable<TDocument> ToDocumentList<TDocument, TModel>(IEnumerable<TModel> models);
+        IEnumerable<TModel> ToModelList<TModel, TDocument>(IEnumerable<TDocument> documents);
     }
 }

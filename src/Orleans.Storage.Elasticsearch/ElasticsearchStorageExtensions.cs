@@ -1,5 +1,8 @@
 ﻿using Orleans.Runtime;
 using System;
+using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Orleans.Storage.Elasticsearch
 {
@@ -8,13 +11,13 @@ namespace Orleans.Storage.Elasticsearch
         /// <summary>
         /// 根据实体获取存储
         /// </summary>
-        /// <typeparam name="TEntity"></typeparam>
+        /// <typeparam name="TModel"></typeparam>
         /// <param name="serviceProvider"></param>
         /// <returns></returns>
-        public static IElasticsearchStorage GetElasticsearchStorage<TEntity>(this IServiceProvider serviceProvider) where TEntity : class
+        public static IElasticsearchStorage<TModel> GetElasticsearchStorage<TModel>(this IServiceProvider serviceProvider)
+             where TModel : IElasticsearchModel
         {
-            var name = typeof(TEntity).FullName;
-            return serviceProvider.GetRequiredServiceByName<IElasticsearchStorage>(name);
+            return serviceProvider.GetRequiredService<IElasticsearchStorage<TModel>>();
         }
 
         /// <summary>
@@ -23,10 +26,20 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="serviceProvider"></param>
         /// <param name="type">实体类型</param>
         /// <returns></returns>
-        public static IElasticsearchStorage GetElasticsearchStorage(this IServiceProvider serviceProvider, Type type) 
+        public static IElasticsearchStorage GetElasticsearchStorage(this IServiceProvider serviceProvider, Type modelType)
         {
-            var name = type.FullName;
-            return serviceProvider.GetRequiredServiceByName<IElasticsearchStorage>(name);
+            if (!typeof(IElasticsearchConcurrencyModel).IsAssignableFrom(modelType))
+                throw new Exception("modelType needs to inherit Orleans.Storage.Elasticsearch.IElasticsearchModel");
+            var type = typeof(IElasticsearchStorage<>).MakeGenericType(modelType);
+            return (IElasticsearchStorage)serviceProvider.GetRequiredService(type);
+        }
+
+        public static async Task ElasticsearchIndexManyAsync(this IServiceProvider serviceProvider, params IElasticsearchModel[] models)
+        {
+            foreach (var m in models)
+            {
+                await serviceProvider.GetElasticsearchStorage(m.GetType()).IndexAsync(m);
+            }
         }
     }
 }

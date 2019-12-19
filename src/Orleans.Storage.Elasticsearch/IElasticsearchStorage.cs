@@ -9,7 +9,7 @@ namespace Orleans.Storage.Elasticsearch
     /// </summary>
     /// <typeparam name="TModel"></typeparam>
     public interface IElasticsearchStorage<TModel> : IElasticsearchStorage
-        where TModel : IStorageModel
+        where TModel : IElasticsearchModel
     {
         new Task<TModel> GetAsync(string id);
         new Task<IEnumerable<TModel>> GetListAsync(IEnumerable<string> ids);
@@ -30,8 +30,8 @@ namespace Orleans.Storage.Elasticsearch
         Task DeleteManyAsync(IEnumerable<string> ids);
         Task<bool> DeleteAsync(string id);
 
-        internal Task<bool> RefreshAsync(string id);
-        internal Task<int> CompensateSync();
-        internal Task<object> GetToDbAsync(string Id);
+        Task<bool> RefreshAsync(string id);
+        Task<object> GetToDbAsync(string Id);
+        Task<int> CompensateSync();
     }
 }

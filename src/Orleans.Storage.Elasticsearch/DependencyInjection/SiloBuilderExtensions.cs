@@ -1,9 +1,11 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Nest;
 using Orleans.Runtime;
 using Orleans.Storage;
 using Orleans.Storage.Elasticsearch;
+using Orleans.Storage.Elasticsearch.Compensate;
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Hosting
 {
@@ -21,7 +23,7 @@ namespace Orleans.Hosting
             {
                 services.AddElasticsearchStorage(buildAction, storageName);
             });
-            build.AddStartupTask<SiloBuilderStartup>();
+            build.AddStartupTask((sp, token) => Startup(sp, token, storageName));
             return build;
         }
 
@@ -37,11 +39,27 @@ namespace Orleans.Hosting
             {
                 services.AddElasticsearchStorage(buildAction, storageName);
             });
-            build.AddStartupTask<SiloBuilderStartup>();
+            build.AddStartupTask((sp, token) => Startup(sp, token, storageName));
             return build;
         }
 
-        
+
+        private static async Task Startup(IServiceProvider serviceProvider, CancellationToken cancellationToken, string storageName)
+        {
+            var reminderTable = serviceProvider.GetService<IReminderTable>();
+            // 需要有配置Orleans定时器
+            if (reminderTable != null)
+            {
+                var options = serviceProvider.GetOptionsByName<ElasticsearchStorageOptions>(storageName);
+                var _grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
+                // 启动数据完整性检查
+                foreach (var name in options.CompleteCheckIndexList)
+                {
+                    await _grainFactory.GetGrain<ICompensater>(name).CompletaCheckAsync();
+                }
+            }
+        }
+
         /// <summary>
         ///  Add Elasticsearch  Storage
         /// </summary>

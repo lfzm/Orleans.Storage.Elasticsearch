@@ -8,13 +8,10 @@ namespace Orleans.Storage.Elasticsearch
 {
     public class ElasticsearchIndexCreator
     {
-        private readonly ElasticsearchStorageBuilder builder;
-        private List<Func<IElasticClient, Task<ICreateIndexResponse>>> createIndexFuncList;
-
-        public ElasticsearchIndexCreator(ElasticsearchStorageBuilder builder)
+        private readonly ElasticClient client;
+        public ElasticsearchIndexCreator(ConnectionSettings settings)
         {
-            this.builder = builder;
-            this.createIndexFuncList = new List<Func<IElasticClient, Task<ICreateIndexResponse>>>();
+            this.client = new ElasticClient(settings);
         }
 
         /// <summary>
@@ -22,7 +19,6 @@ namespace Orleans.Storage.Elasticsearch
         /// </summary>
         public void Create(List<ElasticsearchStorageInfo> storageInfos)
         {
-            var client = new ElasticClient(builder.Settings);
             var results = storageInfos.Select(f => this.Create(client, f.IndexName, f.DocumentType)).ToArray();
             Task.WaitAll(results);
             //验证创建结果

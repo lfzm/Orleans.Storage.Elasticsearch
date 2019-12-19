@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Orleans.Core;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -12,8 +13,8 @@ namespace Orleans.Storage.Elasticsearch.Compensate
     {
         private readonly ILogger _logger;
         private readonly string indexName;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ElasticsearchStorageOptions _options;
-        private readonly ICompensateStorage _storage;
         private readonly ConcurrentQueue<string> idqueue = new ConcurrentQueue<string>();
         private readonly ElasticsearchStorageInfo _storageInfo;
         private DateTime lastMarkTime = DateTime.Now;
@@ -26,11 +27,13 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             this._storageInfo = serviceProvider.GetOptionsByName<ElasticsearchStorageInfo>(indexName);
             this._logger = serviceProvider.GetRequiredService<ILogger<SyncedStatusMarkProcessor>>();
             this._options = serviceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
-            this._storage = (ICompensateStorage)serviceProvider.GetRequiredService(typeof(ICompensateStorage<>).MakeGenericType(_storageInfo.ModelType));
+            this._serviceProvider = serviceProvider;
         }
 
         public void MarkSynced(string id)
         {
+            if (!_storageInfo.CompleteCheck)
+                return;
             idqueue.Enqueue(id);
             // 当堆积数量超过100 或者时间超过10分钟，启动标记已同步
             if (idqueue.Count > _options.MarkProcessMaxCount || DateTime.Now - lastMarkTime >= _options.MarkWaitInterval)
@@ -53,7 +56,8 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                         if (ids.Count >= _options.MarkProcessMaxCount)
                             break;
                     }
-                    await this._storage.ModifySyncedStatus(ids);
+                    var storage = (ICompensateCheckStorage)this._serviceProvider.GetRequiredService(typeof(ICompensateStorage<>).MakeGenericType(_storageInfo.ModelType));
+                    await storage.ModifySyncedStatus(ids);
                     await Task.Delay(1);
                     this.lastMarkTime = DateTime.Now;
                     // 当队列中的数量小于 MAXPROCESSCOUNT 等待下次处理

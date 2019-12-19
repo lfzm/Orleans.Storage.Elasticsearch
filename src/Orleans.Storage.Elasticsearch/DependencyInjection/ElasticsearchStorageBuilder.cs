@@ -16,21 +16,16 @@ namespace Orleans.Storage.Elasticsearch
         /// </summary>
         public string StorageName { get; }
         public IServiceCollection Services { get; }
-        private readonly ElasticsearchIndexCreator _creator;
+        private ConnectionSettings Settings { get; set; } = new ConnectionSettings();
+
         private TimeSpan CompleteCheckInterval = TimeSpan.FromDays(1);
-        private DateTime CompleteCheckStartTime = DateTime.Parse(DateTime.Now.ToString("T")).AddDays(1); // 默认晚上凌晨开始完整性检查
+        private DateTime CompleteCheckStartTime = DateTime.Parse(DateTime.Now.ToString("d")).AddDays(1); // 默认晚上凌晨开始完整性检查
         private Action<ElasticsearchStorageOptions> StorageOptionsAction = opt => { };
         private List<ElasticsearchStorageInfo> StorageInfoList = new List<ElasticsearchStorageInfo>();//Elasticsearch 存储信息集合
-
-        /// <summary>
-        /// Elasticsearch 连接配置
-        /// </summary>
-        internal ConnectionSettings Settings = new ConnectionSettings();
         public ElasticsearchStorageBuilder(IServiceCollection service, string storageName)
         {
             this.Services = service;
             this.StorageName = storageName;
-            this._creator = new ElasticsearchIndexCreator(this);
         }
 
         /// <summary>
@@ -85,94 +80,97 @@ namespace Orleans.Storage.Elasticsearch
             return this;
         }
         public IElasticsearchStorageBuilder AddStorage<TModel>(string indexName)
-            where TModel : class, IStorageModel
+            where TModel : class, IElasticsearchModel
         {
             this.StorageInfoList.Add(new ElasticsearchStorageInfo(indexName, typeof(TModel), typeof(TModel)));
-            this.Services.AddSingletonNamedService<IElasticsearchStorage<TModel>>(indexName, (sp, key) =>
-            {
-                var client = sp.GetRequiredService<IElasticsearchClient<TModel>>();
-                return new ElasticsearchStorage<TModel>(sp, key, client);
-            });
-            this.Services.AddSingletonNamedService<IElasticsearchClient<TModel>>(indexName, (sp, key) =>
-            {
-                var client = sp.GetRequiredServiceByName<IElasticClient>(this.StorageName);
-                var typeName = this.GetIndexTypeName(typeof(TModel));
-                return new ElasticsearchClient<TModel>(sp, client, indexName, typeName);
-            });
+            this.Services.AddSingleton<IElasticsearchStorage<TModel>>((sp) =>
+           {
+               var client = sp.GetRequiredService<IElasticsearchClient<TModel>>();
+               return new ElasticsearchStorage<TModel>(sp, indexName, client);
+           });
+            this.Services.AddSingleton<IElasticsearchClient<TModel>>((sp) =>
+           {
+               var client = sp.GetRequiredServiceByName<IElasticClient>(this.StorageName);
+               var typeName = this.GetIndexTypeName(typeof(TModel));
+               return new ElasticsearchClient<TModel>(sp, client, indexName, typeName);
+           });
             return this;
         }
 
         public IElasticsearchStorageBuilder AddStorage<TModel, TStorage>(string indexName)
-            where TModel : class, IStorageConcurrencyModel
+            where TModel : class, IElasticsearchModel
             where TStorage : class, ICompensateStorage<TModel>
         {
             this.AddStorage<TModel>(indexName);
             this.AddCompensateStorage<TStorage, TModel>(indexName);
-            this.StorageInfoList.FirstOrDefault(f => f.IndexName == indexName).CompleteCheck = true;
             return this;
         }
 
         public IElasticsearchStorageBuilder AddStorage<TModel, TStorage>(string indexName, DateTime checkStartTime, TimeSpan checkInterval)
-            where TModel : class, IStorageConcurrencyModel
+            where TModel : class, IElasticsearchModel
             where TStorage : class, ICompensateStorage<TModel>
         {
             this.AddStorage<TModel, TStorage>(indexName);
             var info = this.StorageInfoList.FirstOrDefault(f => f.IndexName == indexName);
-            info.CompleteCheck = true;
             info.CheckStartTime = checkStartTime;
             info.CheckInterval = checkInterval;
             return this;
         }
 
         public IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument>(string indexName)
-            where TModel : class, IStorageModel
+            where TModel : class, IElasticsearchModel
             where TDocument : class
         {
             this.StorageInfoList.Add(new ElasticsearchStorageInfo(indexName, typeof(TDocument), typeof(TModel)));
-            this.Services.AddSingletonNamedService<IElasticsearchStorage<TModel>>(indexName, (sp, key) =>
-            {
-                var client = sp.GetRequiredService<IElasticsearchClient<TDocument>>();
-                return new ElasticsearchStorage<TModel, TDocument>(sp, key, client);
-            });
-            this.Services.AddSingletonNamedService<IElasticsearchClient<TDocument>>(indexName, (sp, key) =>
-            {
-                var client = sp.GetRequiredServiceByName<IElasticClient>(this.StorageName);
-                var typeName = this.GetIndexTypeName(typeof(TModel));
-                return new ElasticsearchClient<TDocument>(sp, client, indexName, typeName);
-            });
+            this.Services.AddSingleton<IElasticsearchStorage<TModel>>((sp) =>
+           {
+               var client = sp.GetRequiredService<IElasticsearchClient<TDocument>>();
+               return new ElasticsearchStorage<TModel, TDocument>(sp, indexName, client);
+           });
+            this.Services.AddSingleton<IElasticsearchClient<TDocument>>((sp) =>
+           {
+               var client = sp.GetRequiredServiceByName<IElasticClient>(this.StorageName);
+               var typeName = this.GetIndexTypeName(typeof(TDocument));
+               return new ElasticsearchClient<TDocument>(sp, client, indexName, typeName);
+           });
             return this;
         }
 
         public IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName)
-            where TModel : class, IStorageConcurrencyModel
+            where TModel : class, IElasticsearchModel
             where TDocument : class
             where TStorage : class, ICompensateStorage<TModel>
         {
             this.AddMapperStorage<TModel, TDocument>(indexName);
             this.AddCompensateStorage<TStorage, TModel>(indexName);
-            this.StorageInfoList.FirstOrDefault(f => f.IndexName == indexName).CompleteCheck = true;
             return this;
         }
 
         public IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName, DateTime checkStartTime, TimeSpan checkInterval)
-            where TModel : class, IStorageConcurrencyModel
+            where TModel : class, IElasticsearchModel
             where TDocument : class
             where TStorage : class, ICompensateStorage<TModel>
         {
             this.AddMapperStorage<TModel, TDocument, TStorage>(indexName);
             var info = this.StorageInfoList.FirstOrDefault(f => f.IndexName == indexName);
-            info.CompleteCheck = true;
             info.CheckStartTime = checkStartTime;
             info.CheckInterval = checkInterval;
             return this;
         }
 
         private IElasticsearchStorageBuilder AddCompensateStorage<TStorage, TModel>(string indexName)
-            where TModel : class, IStorageConcurrencyModel
+            where TModel : class, IElasticsearchModel
             where TStorage : class, ICompensateStorage<TModel>
         {
-            this.Services.AddSingletonNamedService<ISyncedStatusMarkProcessor>(indexName, (sp, key) => new SyncedStatusMarkProcessor(sp, key));
             this.Services.AddTransient<ICompensateStorage<TModel>, TStorage>();
+            var info = this.StorageInfoList.FirstOrDefault(f => f.IndexName == indexName);
+            info.Compensate = true;
+            if (typeof(ICompensateCheckStorage<TModel>).IsAssignableFrom(typeof(TStorage)) && typeof(IElasticsearchConcurrencyModel).IsAssignableFrom(typeof(TModel)))
+            {
+                // 如有继承ICompensateStorage<> 和 IElasticsearchConcurrencyModel 启动完整性检查
+                this.Services.AddSingletonNamedService<ISyncedStatusMarkProcessor>(indexName, (sp, key) => new SyncedStatusMarkProcessor(sp, key));
+                info.CompleteCheck = true;
+            }
             return this;
         }
 
@@ -180,7 +178,7 @@ namespace Orleans.Storage.Elasticsearch
         {
             var attr = type.GetCustomAttribute<ElasticsearchTypeAttribute>(true);
             if (attr == null)
-                throw new ArgumentNullException("Please identify ElasticsearchTypeAttribute in Mapping Model");
+                throw new ArgumentNullException($"{type.FullName} Please identify ElasticsearchTypeAttribute in Mapping Model");
             return attr.Name;
         }
 
@@ -204,15 +202,20 @@ namespace Orleans.Storage.Elasticsearch
                 {
                     if (f.CompleteCheck)
                     {
-                        if (opt.CheckInterval == null) opt.CheckInterval = this.CompleteCheckInterval;
-                        if (opt.CheckStartTime == null) opt.CheckStartTime = this.CompleteCheckStartTime;
+                        opt.CheckInterval = f.CheckInterval.TotalMilliseconds == 0 ? this.CompleteCheckInterval : f.CheckInterval;
+                        opt.CheckStartTime = f.CheckStartTime == DateTime.MinValue ? this.CompleteCheckStartTime : f.CheckStartTime;
                         opt.CompleteCheck = true;
                     }
                     opt.StorageName = this.StorageName;
+                    opt.ModelType = f.ModelType;
+                    opt.Compensate = f.Compensate;
                     opt.IndexName = f.IndexName;
                     opt.DocumentType = f.DocumentType;
                 });
             });
+
+            // 自动创建索引
+            new ElasticsearchIndexCreator(this.Settings).Create(this.StorageInfoList);
         }
     }
 }

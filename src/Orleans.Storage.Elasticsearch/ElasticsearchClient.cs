@@ -23,7 +23,6 @@ namespace Orleans.Storage.Elasticsearch
             _typeName = typeName;
             _logger = serviceProvider.GetRequiredService<ILogger<ElasticsearchClient<TDocument>>>();
         }
-
         public async Task<bool> DeleteAsync(string id)
         {
             var response = await this._client.DeleteAsync(new DeleteRequest(this._indexName, this._typeName, id));
@@ -37,13 +36,13 @@ namespace Orleans.Storage.Elasticsearch
 
         public Task<IBulkResponse> DeleteManyAsync(IEnumerable<string> ids)
         {
-            return this._client.DeleteManyAsync(ids, this._indexName, this._typeName);
+            return this._client.BulkAsync(b => b.DeleteMany<string>(ids).Index(this._indexName).Type(this._typeName));
         }
 
         public async Task<TDocument> GetAsync(string id)
         {
             var response = await this._client.GetAsync<TDocument>(new GetRequest(_indexName, _typeName, id));
-            if (response.IsValid)
+            if (!response.IsValid)
                 return null;
             return response.Source;
         }
@@ -56,8 +55,8 @@ namespace Orleans.Storage.Elasticsearch
 
         public async Task<IDictionary<string, long>> GetVersionListAsync(IEnumerable<string> ids)
         {
-            var response = await this._client.MultiGetAsync(r => r.Index(_indexName).Type(_typeName).SourceEnabled(false));
-            if (response.IsValid)
+            var response = await this._client.MultiGetAsync(r => r.Index(_indexName).Type(_typeName).GetMany<string>(ids).SourceEnabled(false));
+            if (!response.IsValid)
                 return new Dictionary<string, long>();
             else
                 return response.Hits.ToDictionary(f => f.Id, v => (long)v.Version);
@@ -68,32 +67,27 @@ namespace Orleans.Storage.Elasticsearch
             return await this._client.IndexAsync(document.Document, idx =>
             {
                 var indexDescriptor = idx.Index(this._indexName).Type(this._typeName).Id(document.PrimaryKey);
-                if (document.VersionNo > -1)
+                if (document.VersionNo != int.MinValue && document.VersionNo>0)
                     indexDescriptor.Version(document.VersionNo).VersionType(document.VersionType);
                 return indexDescriptor;
             });
         }
-
         public async Task<IBulkResponse> IndexManyAsync(IEnumerable<ElasticsearchDocument<TDocument>> documents)
         {
             return await this._client.BulkAsync(b =>
             {
                 var bulkDescriptor = b.Index(this._indexName).Type(this._typeName);
-                foreach (var document in documents)
+                bulkDescriptor.IndexMany(documents.Select(f => f.Document), (des, doc) =>
                 {
-                    return bulkDescriptor.Index<TDocument>(x =>
-                    {
-                        x.Document(document.Document);
-                        x.Id(document.PrimaryKey);
-                        if (document.VersionNo > -1)
-                            x.Version(document.VersionNo).VersionType(document.VersionType);
-                        return x;
-                    });
-                }
+                    var document = documents.FirstOrDefault(f => f.Document == doc);
+                    des.Id(document.PrimaryKey);
+                    if (document.VersionNo != int.MinValue && document.VersionNo > 0)
+                        des.Version(document.VersionNo).VersionType(document.VersionType);
+                    return des;
+                });
                 return bulkDescriptor;
             });
         }
-
         public void Handle(IResponse response)
         {
             if (response.TryGetServerErrorReason(out var reason))

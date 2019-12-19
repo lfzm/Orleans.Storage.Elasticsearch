@@ -37,7 +37,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <summary>
         /// 版本号
         /// </summary>
-        public int VersionNo { get; } = -1;
+        public int VersionNo { get; } = int.MinValue;
         /// <summary>
         /// Elasticsearch 文档版本号类型
         /// </summary>

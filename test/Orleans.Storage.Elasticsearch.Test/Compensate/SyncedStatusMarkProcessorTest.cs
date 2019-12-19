@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Orleans.Runtime;
+using Orleans.Storage.Elasticsearch.Compensate;
+using Orleans.Storage.Elasticsearch.Test.Mapping;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -11,49 +13,57 @@ namespace Orleans.Storage.Elasticsearch.Test
     public class SyncedStatusMarkProcessorTest
     {
         private readonly string indexName = "indexName";
-        private readonly Mock<IElasticsearchCompleteCheckStorage> storage = new Mock<IElasticsearchCompleteCheckStorage>();
-        private readonly StorageSyncedMark mpsc;
+        private readonly Mock<ICompensateCheckStorage<UserModel>> storage = new Mock<ICompensateCheckStorage<UserModel>>();
+        private readonly SyncedStatusMarkProcessor markProcessor;
         public SyncedStatusMarkProcessorTest()
         {
             IServiceCollection services = new ServiceCollection();
             services.AddLogging();
             services.AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
-            services.AddTransientNamedService<IElasticsearchCompleteCheckStorage>(indexName, (key, sp) => storage.Object);
-            services.Configure<ElasticsearchStorageOptions>(ElasticsearchStorage.DefaultName, opt =>
+            services.AddTransient<ICompensateStorage<UserModel>>((sp) => storage.Object);
+            services.AddOptions().Configure<ElasticsearchStorageOptions>(ElasticsearchStorage.DefaultName, opt =>
             {
                 opt.MarkProcessMaxCount = 5;
-                opt.MarkWaitInterval = TimeSpan.FromSeconds(10);
+                opt.MarkWaitInterval = TimeSpan.FromSeconds(1);
             });
-            mpsc = new StorageSyncedMark(services.BuildServiceProvider(), indexName, ElasticsearchStorage.DefaultName);
-            storage.Setup(f => f.MarkSyncedAsync(null)).Returns(Task.CompletedTask);
+            services.AddOptions().Configure<ElasticsearchStorageInfo>(indexName, opt =>
+            {
+                opt.IndexName = indexName;
+                opt.ModelType = typeof(UserModel);
+                opt.StorageName = ElasticsearchStorage.DefaultName;
+                opt.DocumentType = typeof(UserDocument);
+                opt.CompleteCheck = true;
+            });
+            storage.Setup(f => f.ModifySyncedStatus(null)).Returns(Task.CompletedTask);
+            markProcessor = new SyncedStatusMarkProcessor(services.BuildServiceProvider(), indexName);
         }
 
         [Fact]
-        public void should_markSyncedAsync_notice()
+        public void should_markSynced_notice()
         {
-            mpsc.MarkSyncedAsync("1");
-            Assert.Equal(1, mpsc.WaitCount);
+            markProcessor.MarkSynced("1");
+            Assert.Equal(1, markProcessor.WaitCount);
         }
         [Fact]
         public async Task should_processor_block_4()
         {
             Enumerable.Range(1, 14).ToList().ForEach(f =>
             {
-                mpsc.MarkSyncedAsync(f.ToString()); ;
+                markProcessor.MarkSynced(f.ToString()); ;
             });
-            await Task.Delay(6);
-            Assert.Equal(4, mpsc.WaitCount);
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            Assert.Equal(4, markProcessor.WaitCount);
         }
         [Fact]
-        public async Task should_should_processor_clearQueue()
+        public async Task should_processor_WaitMarkComplete()
         {
-            for (int i = 1; i < 101; i++)
+            for (int i = 0; i < 101; i++)
             {
                 await Task.Delay(1);
-                mpsc.MarkSyncedAsync(i.ToString());
+                markProcessor.MarkSynced(i.ToString());
             }
-            await mpsc.MarkSynced();
-            Assert.Equal(0, mpsc.WaitCount);
+            await markProcessor.WaitMarkComplete();
+            Assert.Equal(0, markProcessor.WaitCount);
         }
 
     }

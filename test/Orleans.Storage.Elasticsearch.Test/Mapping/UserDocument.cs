@@ -9,7 +9,7 @@ namespace Orleans.Storage.Elasticsearch.Test.Mapping
     [Nest.ElasticsearchType(Name = "doc")]
     public class UserDocument
     {
-        public const string IndexName = "user";
+        public const string IndexName = "test_user";
 
         [Nest.Keyword(Index = true)]
         public int Id { get; set; }

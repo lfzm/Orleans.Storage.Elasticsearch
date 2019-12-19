@@ -11,19 +11,20 @@ namespace Orleans.Storage.Elasticsearch.Compensate
     {
         private const string COMPLETECHECK = "CompleteCheck";
         private readonly ILogger _logger;
-        private readonly ElasticsearchStorageInfo _storageInfo;
-        private readonly ElasticsearchStorageOptions _options;
-        private readonly IElasticsearchStorage _storage;
+        private ElasticsearchStorageInfo _storageInfo;
+        private ElasticsearchStorageOptions _options;
+        private IElasticsearchStorage _storage;
         public Compensater(ILogger<Compensater> logger)
         {
             this._logger = logger;
-            this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(this.GetPrimaryKeyString());
-            this._options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
-            this._storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
         }
 
         public override async Task OnActivateAsync()
         {
+            this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(this.GetPrimaryKeyString());
+            this._options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
+            this._storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
+
             if (_storageInfo.CompleteCheck)
             {
                 // 定时检查数据完整度
@@ -69,12 +70,14 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             if (reminder != null)
             {
                 await this.UnregisterReminder(reminder);
-                this.DeactivateOnIdle();
             }
         }
         private async Task CheckCompleta()
         {
-            int count = 100;
+            if (!_storageInfo.Compensate)
+                return;
+
+            int count = 0;
             Stopwatch watch = new Stopwatch();
             watch.Start();
             // 循环到所有数据全部完成
@@ -90,9 +93,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 {
                     await Task.Delay(10);
                     count = await _storage.CompensateSync();
-                    this._logger.LogDebug($"completa check synced {count} count data");
-                    if (count == -1)
-                        this._logger.LogError($"completa check synced index Elasticsearch failed");
+                    this._logger.LogInformation($"completa check synced {count} count data");
                 }
                 catch (Exception ex)
                 {

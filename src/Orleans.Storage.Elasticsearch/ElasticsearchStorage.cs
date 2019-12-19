@@ -15,7 +15,7 @@ namespace Orleans.Storage.Elasticsearch
     /// </summary>
     /// <typeparam name="TModel">Elasticsearch 存储对象（有标记Mapping映射）</typeparam>
     public class ElasticsearchStorage<TModel> : IElasticsearchStorage<TModel>
-        where TModel : class, IStorageModel
+        where TModel : class, IElasticsearchModel
     {
         private readonly IElasticsearchClient<TModel> _client;
         private readonly IDataflowBufferBlock<TModel> _dataflowBuffer;
@@ -35,8 +35,8 @@ namespace Orleans.Storage.Elasticsearch
         {
             this.ServiceProvider = serviceProvider;
             this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(indexName);
-            this._syncedMarkProcessor = this.ServiceProvider.GetServiceByName<ISyncedStatusMarkProcessor>(indexName);
             this._options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(this._storageInfo.StorageName);
+            this._syncedMarkProcessor = this.ServiceProvider.GetServiceByName<ISyncedStatusMarkProcessor>(indexName);
         }
 
         public virtual Task<TModel> GetAsync(string id)
@@ -126,7 +126,7 @@ namespace Orleans.Storage.Elasticsearch
             }
             var docs = modelWraps.Select(f =>
             {
-                if (f.Data is IStorageConcurrencyModel model)
+                if (f.Data is IElasticsearchConcurrencyModel model)
                     return new ElasticsearchDocument<TModel>(f.Data, f.Data.GetPrimaryKey(), model.GetVersionNo());
                 else
                     return new ElasticsearchDocument<TModel>(f.Data, f.Data.GetPrimaryKey());
@@ -156,7 +156,7 @@ namespace Orleans.Storage.Elasticsearch
         }
         protected async Task CompensateAsync(string id, CompensateType type)
         {
-            if (!this._storageInfo.CompleteCheck)
+            if (!this._storageInfo.Compensate)
                 return;
             var reminderTable = this.ServiceProvider.GetService<IReminderTable>();
             if (reminderTable != null)
@@ -166,19 +166,26 @@ namespace Orleans.Storage.Elasticsearch
                          .CompensateAsync(new CompensateData(id, type));
             }
         }
-        async Task<bool> IElasticsearchStorage.RefreshAsync(string id)
+        public async Task<bool> RefreshAsync(string id)
         {
             // 调用补偿仓储获取数据
-            var model = await this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>().GetAsync(id);
+            var model = await this.GetToDbAsync(id);
             if (model == null)
                 return false;
-            // 更新到Elasticsearch中去
-            return await this.IndexAsync(model);
+            return await this.IndexAsync(model); // 更新到Elasticsearch中去
         }
-        async Task<int> IElasticsearchStorage.CompensateSync()
+        public async Task<object> GetToDbAsync(string Id)
         {
-            // 调用补偿仓储获取
             var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
+            return await storage.GetAsync(Id);
+        }
+        public async Task<int> CompensateSync()
+        {
+            if (!this._storageInfo.CompleteCheck)
+                throw new Exception($"The {nameof(TModel)}  must implement the Orleans.Storage.Elasticsearch.Compensate.ICompensateStorage<{nameof(TModel)} > repository.");
+
+            // 调用补偿仓储获取
+            var storage = (ICompensateCheckStorage<TModel>)this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
             var dataList = await storage.GetWaitingSyncAsync(this._options.CompleteCheckOnceCount);
             if (dataList == null || dataList.Count() == 0)
                 return int.MinValue;
@@ -204,11 +211,7 @@ namespace Orleans.Storage.Elasticsearch
             await this._syncedMarkProcessor.WaitMarkComplete();
             return models.Count();
         }
-        async Task<object> IElasticsearchStorage.GetToDbAsync(string Id)
-        {
-            var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
-            return await storage.GetAsync(Id);
-        }
+
     }
     public class ElasticsearchStorage
     {

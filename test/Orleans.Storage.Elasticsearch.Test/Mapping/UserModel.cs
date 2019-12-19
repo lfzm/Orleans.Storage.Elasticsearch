@@ -5,7 +5,7 @@ using System.Text;
 namespace Orleans.Storage.Elasticsearch.Test.Mapping
 {
     [Serializable]
-    public class UserModel:IStorageModel
+    public class UserModel:IElasticsearchModel
     {
         public int Id { get; set; }
         public string Name { get; set; }

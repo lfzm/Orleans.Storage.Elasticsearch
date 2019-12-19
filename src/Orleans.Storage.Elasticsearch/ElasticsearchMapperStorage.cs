@@ -15,7 +15,7 @@ namespace Orleans.Storage.Elasticsearch
     /// <typeparam name="TModel">数据对象</typeparam>
     /// <typeparam name="TDocument">Elasticsearch 存储对象（有标记Mapping映射）</typeparam>
     public class ElasticsearchStorage<TModel, TDocument> : ElasticsearchStorage<TModel>, IElasticsearchStorage<TModel>
-        where TModel : class, IStorageModel
+        where TModel : class, IElasticsearchModel
         where TDocument : class
     {
         private readonly IStorageDocumentConverter _documentConverter;
@@ -42,7 +42,7 @@ namespace Orleans.Storage.Elasticsearch
         {
             var doc = this._documentConverter.ToDocument<TDocument, TModel>(model);
             ElasticsearchDocument<TDocument> ed = null;
-            if (model is IStorageConcurrencyModel m)
+            if (model is IElasticsearchConcurrencyModel m)
                 ed = new ElasticsearchDocument<TDocument>(doc, model.GetPrimaryKey(), m.GetVersionNo());
             else
                 ed = new ElasticsearchDocument<TDocument>(doc, model.GetPrimaryKey());

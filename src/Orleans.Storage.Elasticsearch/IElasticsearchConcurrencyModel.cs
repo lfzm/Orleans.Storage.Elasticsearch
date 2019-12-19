@@ -5,7 +5,7 @@
     /// Elasticsearch存储并发模型
     /// </summary>
     /// </summary>
-    public interface IStorageConcurrencyModel : IStorageModel
+    public interface IElasticsearchConcurrencyModel : IElasticsearchModel
     {
         public int GetVersionNo();
     }

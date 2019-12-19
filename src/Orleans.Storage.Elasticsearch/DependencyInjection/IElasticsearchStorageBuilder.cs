@@ -48,7 +48,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="indexName">Elasticsearch 索引名称</param>
         /// <returns></returns>
         IElasticsearchStorageBuilder AddStorage<TModel>(string indexName)
-           where TModel :class, IStorageModel;
+           where TModel :class, IElasticsearchModel;
         /// <summary>
         /// 配置 Elasticsearch Storage
         /// 数据Model和 Elasticsearch mapping model 一样情况下使用
@@ -58,7 +58,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="indexName">Elasticsearch 索引名称</param>
         /// <returns></returns>
         IElasticsearchStorageBuilder AddStorage<TModel, TStorage>(string indexName)
-           where TModel : class, IStorageConcurrencyModel
+           where TModel : class, IElasticsearchModel
            where TStorage : class, ICompensateStorage<TModel>;
         /// <summary>
         /// 配置 Elasticsearch Storage
@@ -71,7 +71,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="checkInterval">检查时间间隔</param>
         /// <returns></returns>
         IElasticsearchStorageBuilder AddStorage<TModel, TStorage>(string indexName, DateTime checkStartTime, TimeSpan checkInterval)
-           where TModel : class, IStorageConcurrencyModel
+           where TModel : class, IElasticsearchModel
            where TStorage : class, ICompensateStorage<TModel>;
         /// <summary>
         /// 配置 Elasticsearch Storage
@@ -82,7 +82,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="indexName">Elasticsearch 索引名称</param>
         /// <returns></returns>
         IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument>(string indexName)
-           where TModel : class, IStorageModel
+           where TModel : class, IElasticsearchModel
            where TDocument : class;
         /// <summary>
         /// 配置 Elasticsearch Storage
@@ -94,7 +94,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="indexName">Elasticsearch 索引名称</param>
         /// <returns></returns>
         IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName)
-           where TModel : class, IStorageConcurrencyModel
+           where TModel : class, IElasticsearchModel
            where TDocument : class
            where TStorage : class, ICompensateStorage<TModel>;
 
@@ -110,7 +110,7 @@ namespace Orleans.Storage.Elasticsearch
         /// <param name="checkInterval">检查时间间隔</param>
         /// <returns></returns>
         IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName, DateTime checkStartTime, TimeSpan checkInterval)
-           where TModel : class, IStorageConcurrencyModel
+           where TModel : class, IElasticsearchModel
            where TDocument : class
            where TStorage : class, ICompensateStorage<TModel>;
 

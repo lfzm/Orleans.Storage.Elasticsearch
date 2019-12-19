@@ -8,7 +8,7 @@ namespace Orleans.Storage.Elasticsearch.Test
 {
     public class GrainStorageTest
     {
-        private readonly Mock<IElasticsearchStorage> storageMock = new Mock<IElasticsearchStorage>();
+        private readonly Mock<IElasticsearchStorage<UserModel>> storageMock = new Mock<IElasticsearchStorage<UserModel>>();
         private readonly Mock<IGrainState> stateMock = new Mock<IGrainState>();
         private readonly GrainStorage _storage;
 
@@ -16,7 +16,7 @@ namespace Orleans.Storage.Elasticsearch.Test
         {
             IServiceCollection services = new ServiceCollection();
             services.AddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
-            services.AddTransientNamedService<IElasticsearchStorage>(typeof(UserModel).FullName, (sp, key) =>
+            services.AddTransient<IElasticsearchStorage<UserModel>>(sp =>
             {
                 return storageMock.Object;
             });
@@ -26,11 +26,9 @@ namespace Orleans.Storage.Elasticsearch.Test
         [Fact]
         public void should_getRepository_success()
         {
-            stateMock.Setup(s => s.State).Returns(new UserModel());
-            var storage =  _storage.GetRepository(stateMock.Object);
+            stateMock.Setup(s => s.Type).Returns(typeof(UserModel));
+            var storage = _storage.GetRepository(stateMock.Object);
             Assert.NotNull(storage);
         }
-
-
     }
 }
