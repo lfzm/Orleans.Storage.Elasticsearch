@@ -17,7 +17,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         private readonly ElasticsearchStorageOptions _options;
         private readonly ConcurrentQueue<string> idqueue = new ConcurrentQueue<string>();
         private readonly ElasticsearchStorageInfo _storageInfo;
-        private DateTime lastMarkTime = DateTime.Now;
+        private DateTime lastMarkTime = DateTime.MinValue;
         private bool AllMark = false; // 是否清空队列中所有的待标记Id
         private int isProcessing = 0;
 
