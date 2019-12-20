@@ -67,6 +67,18 @@ namespace Orleans.Storage.Elasticsearch
         /// <typeparam name="TModel">数据 Model</typeparam>
         /// <typeparam name="TStorage">完整性检查存储</typeparam>
         /// <param name="indexName">Elasticsearch 索引名称</param>
+        /// <param name="checkInterval">检查时间间隔</param>
+        /// <returns></returns>
+        IElasticsearchStorageBuilder AddStorage<TModel, TStorage>(string indexName, TimeSpan checkInterval)
+           where TModel : class, IElasticsearchModel
+           where TStorage : class, ICompensateStorage<TModel>;
+        /// <summary>
+        /// 配置 Elasticsearch Storage
+        /// 数据Model和 Elasticsearch mapping model 一样情况下使用
+        /// </summary>
+        /// <typeparam name="TModel">数据 Model</typeparam>
+        /// <typeparam name="TStorage">完整性检查存储</typeparam>
+        /// <param name="indexName">Elasticsearch 索引名称</param>
         /// <param name="checkStartTime">检查开始时间</param>
         /// <param name="checkInterval">检查时间间隔</param>
         /// <returns></returns>
@@ -97,7 +109,20 @@ namespace Orleans.Storage.Elasticsearch
            where TModel : class, IElasticsearchModel
            where TDocument : class
            where TStorage : class, ICompensateStorage<TModel>;
-
+        /// <summary>
+        /// 配置 Elasticsearch Storage
+        /// 需要通过 <see cref="AddDocumentConverter"/> 方法配置Document转换器
+        /// </summary>
+        /// <typeparam name="TModel">数据Model</typeparam>
+        /// <typeparam name="TDocument">Elasticsearch mapping model </typeparam>
+        /// <typeparam name="TStorage">完整性检查存储</typeparam>
+        /// <param name="indexName">Elasticsearch 索引名称</param>
+        /// <param name="checkInterval">检查时间间隔</param>
+        /// <returns></returns>
+        IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName, TimeSpan checkInterval)
+           where TModel : class, IElasticsearchModel
+           where TDocument : class
+           where TStorage : class, ICompensateStorage<TModel>;
         /// <summary>
         /// 配置 Elasticsearch Storage
         /// 需要通过 <see cref="AddDocumentConverter"/> 方法配置Document转换器

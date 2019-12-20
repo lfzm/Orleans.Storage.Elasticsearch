@@ -10,6 +10,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         /// </summary>
         /// <param name="id">补偿的数据</param>
         /// <returns></returns>
+        [AlwaysInterleave]
         Task CompensateAsync(CompensateData data);
         /// <summary>
         /// 完整性检查

@@ -12,7 +12,7 @@
     <RepositoryUrl>https://github.com/lfzm/Orleans.Storage.Elasticsearch</RepositoryUrl>
     <RepositoryType></RepositoryType>
     <PackageTags>Orleans Elasticsearch</PackageTags>
-    <Version>3.1.0-bate1</Version>
+    <Version>3.1.0-bate2</Version>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 

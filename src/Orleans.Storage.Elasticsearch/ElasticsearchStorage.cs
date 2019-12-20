@@ -74,17 +74,15 @@ namespace Orleans.Storage.Elasticsearch
                 return false;
             }
         }
-        public virtual Task IndexManyAsync(IEnumerable<TModel> modelList)
+        public virtual async Task IndexManyAsync(IEnumerable<TModel> modelList)
         {
             var tasks = modelList.Select(f => this.IndexAsync(f));
-            Task.WaitAll(tasks.ToArray());
-            return Task.CompletedTask;
+            await Task.WhenAll(tasks.ToArray());
         }
-        public virtual Task DeleteManyAsync(IEnumerable<string> ids)
+        public virtual async Task DeleteManyAsync(IEnumerable<string> ids)
         {
             var tasks = ids.Select(f => this.DeleteAsync(f));
-            Task.WaitAll(tasks.ToArray());
-            return Task.CompletedTask;
+            await Task.WhenAll(tasks.ToArray());
         }
         async Task<object> IElasticsearchStorage.GetAsync(string id)
         {
@@ -191,25 +189,36 @@ namespace Orleans.Storage.Elasticsearch
                 return int.MinValue;
 
             // 获取es是否已经同步
-            var versions = await this._client.GetVersionListAsync(dataList.Select(f => f.Id));
+            var versions = await this.GetVersionListAsync(dataList.Select(f => f.Id));
             var waitSyncIds = dataList.Where(f =>
             {
                 if (versions.ContainsKey(f.Id))
                 {
                     // 版本相同情况下无需补偿
-                    if (versions[f.Id] == f.Version)
+                    if (versions[f.Id] >= f.Version)
+                    {
+                        this._syncedMarkProcessor.MarkSynced(f.Id);
                         return false;
+                    }
                 }
                 return true;
-            }).Select(f => f.Id);
+            }).Select(f => f.Id).ToList();
 
             // 获取所有待补偿的数据
-            var models = await storage.GetListAsync(waitSyncIds);
-            await this.IndexManyAsync(models);
-
+            if (waitSyncIds.Count > 0)
+            {
+                var models = await storage.GetListAsync(waitSyncIds);
+                await this.IndexManyAsync(models);
+            }
             // 等待全部标记完成
             await this._syncedMarkProcessor.WaitMarkComplete();
-            return models.Count();
+            return waitSyncIds.Count();
+
+        }
+
+        public virtual Task<IDictionary<string, long>> GetVersionListAsync(IEnumerable<string> ids)
+        {
+            return this._client.GetVersionListAsync(ids);
         }
 
     }

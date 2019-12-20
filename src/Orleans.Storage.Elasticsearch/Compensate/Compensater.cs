@@ -18,7 +18,6 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         {
             this._logger = logger;
         }
-
         public override async Task OnActivateAsync()
         {
             this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(this.GetPrimaryKeyString());
@@ -28,7 +27,10 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             if (_storageInfo.CompleteCheck)
             {
                 // 定时检查数据完整度
-                TimeSpan dueTime = _storageInfo.CheckStartTime - DateTime.Now;
+                TimeSpan dueTime = _storageInfo.CheckInterval;
+                if (_storageInfo.CheckStartTime > DateTime.Now)
+                    dueTime = _storageInfo.CheckStartTime - DateTime.Now;
+                this._logger.LogDebug($"{_storageInfo.IndexName} CheckStartTime:{_storageInfo.CheckStartTime} CheckInterval:{_storageInfo.CheckInterval} start complete check");
                 await this.RegisterOrUpdateReminder(COMPLETECHECK, dueTime, _storageInfo.CheckInterval);
             }
             await base.OnActivateAsync();
@@ -50,6 +52,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         }
         private async Task Compensate(CompensateData data)
         {
+            this._logger.LogDebug($"Start data compensation: {data.ToString()}");
             if (data.Type == CompensateType.Clear)
             {
                 if (!await this._storage.DeleteAsync(data.Id))
@@ -66,6 +69,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                     return;
                 }
             }
+            this._logger.LogDebug("Data compensation succeeded, stop timer");
             var reminder = await this.GetReminder(data.ToString());
             if (reminder != null)
             {
@@ -76,15 +80,15 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         {
             if (!_storageInfo.Compensate)
                 return;
-
+            this._logger.LogDebug($"Start sanity check: {this._storageInfo.IndexName}");
             int count = 0;
             Stopwatch watch = new Stopwatch();
             watch.Start();
             // 循环到所有数据全部完成
-            while (count == int.MinValue)
+            while (count > int.MinValue)
             {
                 // 执行时间超过30分钟，暂停检查
-                if (watch.Elapsed == _options.CompleteCheckTimeOut)
+                if (watch.Elapsed >= _options.CompleteCheckTimeOut)
                 {
                     watch.Stop();
                     break;
@@ -93,11 +97,11 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 {
                     await Task.Delay(10);
                     count = await _storage.CompensateSync();
-                    this._logger.LogInformation($"completa check synced {count} count data");
+                    this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {count} count data");
                 }
                 catch (Exception ex)
                 {
-                    this._logger.LogError(ex, "completa check failed");
+                    this._logger.LogError(ex, $"{this._storageInfo.IndexName} completa check failed");
                 }
             }
 

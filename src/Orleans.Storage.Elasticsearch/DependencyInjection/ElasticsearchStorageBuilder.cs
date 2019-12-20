@@ -117,6 +117,13 @@ namespace Orleans.Storage.Elasticsearch
             return this;
         }
 
+        public IElasticsearchStorageBuilder AddStorage<TModel, TStorage>(string indexName, TimeSpan checkInterval)
+        where TModel : class, IElasticsearchModel
+        where TStorage : class, ICompensateStorage<TModel>
+        {
+            return this.AddStorage<TModel, TStorage>(indexName, DateTime.Now, checkInterval);
+        }
+
         public IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument>(string indexName)
             where TModel : class, IElasticsearchModel
             where TDocument : class
@@ -144,6 +151,14 @@ namespace Orleans.Storage.Elasticsearch
             this.AddMapperStorage<TModel, TDocument>(indexName);
             this.AddCompensateStorage<TStorage, TModel>(indexName);
             return this;
+        }
+
+        public IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName, TimeSpan checkInterval)
+           where TModel : class, IElasticsearchModel
+           where TDocument : class
+           where TStorage : class, ICompensateStorage<TModel>
+        {
+            return this.AddMapperStorage<TModel, TDocument, TStorage>(indexName, DateTime.Now, checkInterval);
         }
 
         public IElasticsearchStorageBuilder AddMapperStorage<TModel, TDocument, TStorage>(string indexName, DateTime checkStartTime, TimeSpan checkInterval)

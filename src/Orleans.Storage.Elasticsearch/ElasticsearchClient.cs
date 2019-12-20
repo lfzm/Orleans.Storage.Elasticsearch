@@ -27,9 +27,7 @@ namespace Orleans.Storage.Elasticsearch
         {
             var response = await this._client.DeleteAsync(new DeleteRequest(this._indexName, this._typeName, id));
             if (!response.IsValid)
-            {
                 return false;
-            }
             else
                 return true;
         }

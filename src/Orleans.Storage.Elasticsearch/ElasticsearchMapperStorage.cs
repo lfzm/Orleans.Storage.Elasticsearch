@@ -104,5 +104,10 @@ namespace Orleans.Storage.Elasticsearch
                 });
             }
         }
+
+        public override Task<IDictionary<string, long>> GetVersionListAsync(IEnumerable<string> ids)
+        {
+            return this._client.GetVersionListAsync(ids);
+        }
     }
 }
