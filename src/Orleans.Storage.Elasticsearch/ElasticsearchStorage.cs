@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Storage.Elasticsearch.Compensate;
 using Orleans.Storage.Elasticsearch.Infrastructure;
@@ -19,6 +20,8 @@ namespace Orleans.Storage.Elasticsearch
     {
         private readonly IElasticsearchClient<TModel> _client;
         private readonly IDataflowBufferBlock<TModel> _dataflowBuffer;
+        private readonly ILogger _logger;
+
         protected readonly IServiceProvider ServiceProvider;
         protected readonly ElasticsearchStorageInfo _storageInfo;
         protected readonly ISyncedStatusMarkProcessor _syncedMarkProcessor;
@@ -29,6 +32,7 @@ namespace Orleans.Storage.Elasticsearch
         {
             this._client = client;
             this._dataflowBuffer = new DataflowBufferBlock<TModel>(this.IndexMany);
+            this._logger = this.ServiceProvider.GetRequiredService<ILogger<ElasticsearchStorage<TModel>>>();
         }
 
         public ElasticsearchStorage(IServiceProvider serviceProvider, string indexName)
@@ -144,6 +148,7 @@ namespace Orleans.Storage.Elasticsearch
                         // 如果有版本冲突，默认成功执行
                         if (r.Status == 409 && r.Error.Reason.Contains("version conflict"))
                         {
+                            this._logger.LogInformation($"{id} Elasticsearch index version conflict");
                             w.CompleteHandler(true);
                             return;
                         }

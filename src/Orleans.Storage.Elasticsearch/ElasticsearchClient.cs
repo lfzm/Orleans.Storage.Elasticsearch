@@ -26,20 +26,26 @@ namespace Orleans.Storage.Elasticsearch
         public async Task<bool> DeleteAsync(string id)
         {
             var response = await this._client.DeleteAsync(new DeleteRequest(this._indexName, this._typeName, id));
+            this.Loggin(response);
             if (!response.IsValid)
+            {
                 return false;
+            }
             else
                 return true;
         }
 
-        public Task<IBulkResponse> DeleteManyAsync(IEnumerable<string> ids)
+        public async Task<IBulkResponse> DeleteManyAsync(IEnumerable<string> ids)
         {
-            return this._client.BulkAsync(b => b.DeleteMany<string>(ids).Index(this._indexName).Type(this._typeName));
+            var response = await this._client.BulkAsync(b => b.DeleteMany<string>(ids).Index(this._indexName).Type(this._typeName));
+            this.Loggin(response);
+            return response;
         }
 
         public async Task<TDocument> GetAsync(string id)
         {
             var response = await this._client.GetAsync<TDocument>(new GetRequest(_indexName, _typeName, id));
+            this.Loggin(response);
             if (!response.IsValid)
                 return null;
             return response.Source;
@@ -48,6 +54,7 @@ namespace Orleans.Storage.Elasticsearch
         public async Task<IEnumerable<TDocument>> GetListAsync(IEnumerable<string> ids)
         {
             var responses = await this._client.GetManyAsync<TDocument>(ids, _indexName, _typeName);
+         
             return responses?.ToList().Select(f => f.Source);
         }
 
@@ -62,17 +69,19 @@ namespace Orleans.Storage.Elasticsearch
 
         public async Task<IIndexResponse> IndexAsync(ElasticsearchDocument<TDocument> document)
         {
-            return await this._client.IndexAsync(document.Document, idx =>
+            var response = await this._client.IndexAsync(document.Document, idx =>
             {
                 var indexDescriptor = idx.Index(this._indexName).Type(this._typeName).Id(document.PrimaryKey);
-                if (document.VersionNo != int.MinValue && document.VersionNo>0)
+                if (document.VersionNo != int.MinValue && document.VersionNo > 0)
                     indexDescriptor.Version(document.VersionNo).VersionType(document.VersionType);
                 return indexDescriptor;
             });
+            this.Loggin(response);
+            return response;
         }
         public async Task<IBulkResponse> IndexManyAsync(IEnumerable<ElasticsearchDocument<TDocument>> documents)
         {
-            return await this._client.BulkAsync(b =>
+            var response = await this._client.BulkAsync(b =>
             {
                 var bulkDescriptor = b.Index(this._indexName).Type(this._typeName);
                 bulkDescriptor.IndexMany(documents.Select(f => f.Document), (des, doc) =>
@@ -85,20 +94,25 @@ namespace Orleans.Storage.Elasticsearch
                 });
                 return bulkDescriptor;
             });
+            this.Loggin(response);
+            return response;
         }
-        public void Handle(IResponse response)
+        public void Loggin(IResponse response)
         {
-            if (response.TryGetServerErrorReason(out var reason))
+            if (!response.IsValid)
             {
-                this._logger.LogError($"request elasticsearch filed ; reason : {reason}");
-            }
-            else if (response.OriginalException != null)
-            {
-                this._logger.LogError(response.OriginalException, "request elasticsearch filed");
-            }
-            else
-            {
-                this._logger.LogError($"request elasticsearch filed ");
+                if (response.TryGetServerErrorReason(out var reason))
+                {
+                    this._logger.LogError($"request elasticsearch filed ; reason : {reason}");
+                }
+                else if (response.OriginalException != null)
+                {
+                    this._logger.LogError(response.OriginalException, "request elasticsearch filed");
+                }
+                else
+                {
+                    this._logger.LogError($"request elasticsearch filed ");
+                }
             }
         }
     }
