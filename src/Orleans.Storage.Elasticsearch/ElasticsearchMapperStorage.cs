@@ -34,15 +34,21 @@ namespace Orleans.Storage.Elasticsearch
         public override async Task<TModel> GetAsync(string id)
         {
             var document = await _client.GetAsync(id);
+            if (document == null)
+                return null;
             return this._documentConverter.ToModel<TModel, TDocument>(document);
         }
         public override async Task<IEnumerable<TModel>> GetListAsync(IEnumerable<string> ids)
         {
             var documents = await _client.GetListAsync(ids);
+            if (documents == null)
+                return null;
             return this._documentConverter.ToModelList<TModel, TDocument>(documents);
         }
         public override async Task<bool> IndexAsync(TModel model)
         {
+            if (model == null)
+                return false;
             var doc = this._documentConverter.ToDocument<TDocument, TModel>(model);
             ElasticsearchDocument<TDocument> ed = null;
             if (model is IElasticsearchConcurrencyModel m)
