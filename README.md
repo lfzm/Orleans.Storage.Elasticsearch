@@ -4,7 +4,6 @@
 
 `Orleans.Storage.Elasticsearch` 是 Orleans Storage 扩展器，实现了自动存储、失败补偿、数据完整检查、自动创建索引等功能。
 
-### 概念
 
 > **Model**：是 `Orleans.Grain<TState>` 的状态，用于 `Orleans.Storage` 存储的存储对象，使用Orleans.Storage.Elasticsearch 存储时必须实现 `IElasticsearchModel` 接口。
 >
