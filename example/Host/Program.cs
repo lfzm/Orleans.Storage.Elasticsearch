@@ -44,7 +44,7 @@ namespace Host
             var builder = new SiloHostBuilder()
                 .AddElasticsearchStorage(opt =>
                 {
-                    opt.ConfigureConnection(new ConnectionSettings(new Uri("http://es.hnzop.com")));
+                    opt.ConfigureConnection(new ConnectionSettings(new Uri("http://localhost:9200")));
                     opt.AddStorage<UserModel>(UserModel.IndexName);
                     opt.AddDocumentConverter<ElasticsearchDocumentConverter>();
                     opt.AddMapperStorage<AccountModel, AccountDocument>(AccountDocument.IndexName);
