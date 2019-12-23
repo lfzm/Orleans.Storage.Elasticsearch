@@ -28,8 +28,8 @@ namespace Orleans.Storage.Elasticsearch
         /// <returns></returns>
         public static IElasticsearchStorage GetElasticsearchStorage(this IServiceProvider serviceProvider, Type modelType)
         {
-            if (!typeof(IElasticsearchConcurrencyModel).IsAssignableFrom(modelType))
-                throw new Exception("modelType needs to inherit Orleans.Storage.Elasticsearch.IElasticsearchModel");
+            if (!typeof(IElasticsearchModel).IsAssignableFrom(modelType))
+                throw new Exception($"{modelType.FullName} needs to inherit Orleans.Storage.Elasticsearch.IElasticsearchModel");
             var type = typeof(IElasticsearchStorage<>).MakeGenericType(modelType);
             return (IElasticsearchStorage)serviceProvider.GetRequiredService(type);
         }
