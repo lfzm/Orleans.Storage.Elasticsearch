@@ -145,11 +145,11 @@ namespace Orleans.Storage.Elasticsearch
                     var r = response.Items.FirstOrDefault(f => f.Id == id);
                     if (!r.IsValid)
                     {
-                        this._logger.LogError($"{id} Elasticsearch index failed ; Reason：{r.Error?.Reason}");
+                        this._logger.LogError($"{nameof(TModel)} {id} Elasticsearch index failed ; Reason：{r.Error?.Reason}");
                         // 如果有版本冲突，默认成功执行
                         if (r.Status == 409 && r.Error.Reason.Contains("version conflict"))
                         {
-                            this._logger.LogInformation($"{id} Elasticsearch index version conflict");
+                            this._logger.LogInformation($"{nameof(TModel)} {id} Elasticsearch index version conflict");
                             w.CompleteHandler(true);
                             return;
                         }

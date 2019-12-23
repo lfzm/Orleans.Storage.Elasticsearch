@@ -103,15 +103,15 @@ namespace Orleans.Storage.Elasticsearch
             {
                 if (response.TryGetServerErrorReason(out var reason))
                 {
-                    this._logger.LogError($"request elasticsearch filed ; reason : {reason}");
+                    this._logger.LogWarning($"request elasticsearch filed ; reason : {reason}");
                 }
                 else if (response.OriginalException != null)
                 {
-                    this._logger.LogError(response.OriginalException, "request elasticsearch filed");
+                    this._logger.LogWarning(response.OriginalException, "request elasticsearch filed");
                 }
                 else
                 {
-                    this._logger.LogError($"request elasticsearch filed ");
+                    this._logger.LogWarning($"request elasticsearch filed ");
                 }
             }
         }

@@ -95,16 +95,16 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 }
                 try
                 {
-                    await Task.Delay(10);
                     count = await _storage.CompensateSync();
                     this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {count} count data");
+                    await Task.Delay(100);
                 }
                 catch (Exception ex)
                 {
+                    watch.Stop();
                     this._logger.LogError(ex, $"{this._storageInfo.IndexName} completa check failed");
                 }
             }
-
         }
     }
 }
