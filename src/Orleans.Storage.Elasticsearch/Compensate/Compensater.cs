@@ -13,7 +13,6 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         private readonly ILogger _logger;
         private ElasticsearchStorageInfo _storageInfo;
         private ElasticsearchStorageOptions _options;
-        private IElasticsearchStorage _storage;
         public Compensater(ILogger<Compensater> logger)
         {
             this._logger = logger;
@@ -22,7 +21,6 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         {
             this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(this.GetPrimaryKeyString());
             this._options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
-            this._storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
 
             if (_storageInfo.CompleteCheck)
             {
@@ -52,10 +50,11 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         }
         private async Task Compensate(CompensateData data)
         {
+          var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
             this._logger.LogDebug($"Start data compensation: {data.ToString()}");
             if (data.Type == CompensateType.Clear)
             {
-                if (!await this._storage.DeleteAsync(data.Id))
+                if (!await _storage.DeleteAsync(data.Id))
                 {
                     this._logger.LogInformation($"{_storageInfo.IndexName} {data.Id} Compensate clear filed");
                     return;
@@ -63,7 +62,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             }
             else
             {
-                if (!await this._storage.RefreshAsync(data.Id))
+                if (!await _storage.RefreshAsync(data.Id))
                 {
                     this._logger.LogInformation($"{_storageInfo.IndexName} {data.Id} Compensate refresh filed");
                     return;
@@ -95,6 +94,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 }
                 try
                 {
+                    var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
                     count = await _storage.CompensateSync();
                     this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {count} count data");
                     await Task.Delay(100);

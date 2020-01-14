@@ -21,7 +21,6 @@ namespace Orleans.Storage.Elasticsearch
         private readonly IElasticsearchClient<TModel> _client;
         private readonly IDataflowBufferBlock<TModel> _dataflowBuffer;
         private readonly ILogger _logger;
-
         protected readonly IServiceProvider ServiceProvider;
         protected readonly ElasticsearchStorageInfo _storageInfo;
         protected readonly ISyncedStatusMarkProcessor _syncedMarkProcessor;
@@ -196,25 +195,27 @@ namespace Orleans.Storage.Elasticsearch
 
             // 获取es是否已经同步
             var versions = await this.GetVersionListAsync(dataList.Select(f => f.Id));
-            var waitSyncIds = dataList.Where(f =>
+            var waitSyncIds = new List<string>();
+            dataList.ToList().ForEach(f =>
             {
-                if (versions.ContainsKey(f.Id))
-                {
-                    // 版本相同情况下无需补偿
-                    if (versions[f.Id] >= f.Version)
-                    {
-                        this._syncedMarkProcessor.MarkSynced(f.Id);
-                        return false;
-                    }
-                }
-                return true;
-            }).Select(f => f.Id).ToList();
+                 if (versions.ContainsKey(f.Id))
+                 {
+                     // 版本相同情况下无需补偿
+                     if (versions[f.Id] >= f.Version)
+                         this._syncedMarkProcessor.MarkSynced(f.Id);
+                     else
+                         waitSyncIds.Add(f.Id);
+                 }
+             });
 
             // 获取所有待补偿的数据
             if (waitSyncIds.Count > 0)
             {
                 var models = await storage.GetListAsync(waitSyncIds);
-                await this.IndexManyAsync(models);
+                if(models!=null && models.Count() > 0)
+                {
+                    await this.IndexManyAsync(models);
+                }
             }
             // 等待全部标记完成
             await this._syncedMarkProcessor.WaitMarkComplete();
@@ -226,7 +227,6 @@ namespace Orleans.Storage.Elasticsearch
         {
             return this._client.GetVersionListAsync(ids);
         }
-
     }
     public class ElasticsearchStorage
     {
