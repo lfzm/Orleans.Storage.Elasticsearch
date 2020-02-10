@@ -96,6 +96,8 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 {
                     var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
                     count = await _storage.CompensateSync();
+                    if (count == int.MinValue)
+                        return;
                     this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {count} count data");
                     await Task.Delay(100);
                 }
