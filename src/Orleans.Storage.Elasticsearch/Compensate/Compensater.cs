@@ -84,6 +84,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             Stopwatch watch = new Stopwatch();
             watch.Start();
             // 循环到所有数据全部完成
+            var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
             while (compensateComplete == false)
             {
                 // 执行时间超过30分钟，暂停检查
@@ -94,7 +95,6 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 }
                 try
                 {
-                    var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
                     compensateComplete = await _storage.CompensateSync();
                     if (!compensateComplete)
                         await Task.Delay(100);

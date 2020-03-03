@@ -180,7 +180,8 @@ namespace Orleans.Storage.Elasticsearch
             this.Services.AddTransient<ICompensateStorage<TModel>, TStorage>();
             var info = this.StorageInfoList.FirstOrDefault(f => f.IndexName == indexName);
             info.Compensate = true;
-            if (typeof(ICompensateCheckStorage<TModel>).IsAssignableFrom(typeof(TStorage)) && typeof(IElasticsearchConcurrencyModel).IsAssignableFrom(typeof(TModel)))
+            if (typeof(ICompensateCheckStorage<TModel>).IsAssignableFrom(typeof(TStorage)) 
+                && typeof(IElasticsearchConcurrencyModel).IsAssignableFrom(typeof(TModel)))
             {
                 // 如有继承ICompensateStorage<> 和 IElasticsearchConcurrencyModel 启动完整性检查
                 this.Services.AddSingletonNamedService<ISyncedStatusMarkProcessor>(indexName, (sp, key) => new SyncedStatusMarkProcessor(sp, key));
