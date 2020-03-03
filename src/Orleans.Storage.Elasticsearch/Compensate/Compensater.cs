@@ -103,6 +103,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 {
                     watch.Stop();
                     this._logger.LogError(ex, $"{this._storageInfo.IndexName} completa check failed");
+                    break;
                 }
             }
         }

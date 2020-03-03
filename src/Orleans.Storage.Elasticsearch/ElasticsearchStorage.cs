@@ -220,7 +220,7 @@ namespace Orleans.Storage.Elasticsearch
             }
             // 等待全部标记完成
             await this._syncedMarkProcessor.WaitMarkComplete();
-            this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {waitSyncIds.Count()} count data");
+            this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {waitSyncIds.Count} count data");
 
             //Returns whether processing has been completed
             return dataList.Count() < this._options.CompleteCheckOnceCount;
