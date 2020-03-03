@@ -182,7 +182,7 @@ namespace Orleans.Storage.Elasticsearch
             var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
             return await storage.GetAsync(Id);
         }
-        public async Task<int> CompensateSync()
+        public async Task<bool> CompensateSync()
         {
             if (!this._storageInfo.CompleteCheck)
                 throw new Exception($"The {nameof(TModel)}  must implement the Orleans.Storage.Elasticsearch.Compensate.ICompensateStorage<{nameof(TModel)} > repository.");
@@ -191,36 +191,39 @@ namespace Orleans.Storage.Elasticsearch
             var storage = (ICompensateCheckStorage<TModel>)this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
             var dataList = await storage.GetWaitingSyncAsync(this._options.CompleteCheckOnceCount);
             if (dataList == null || dataList.Count() == 0)
-                return int.MinValue;
+                return true;
+            this._logger.LogDebug($"Number of data to be synchronized for query  {dataList.Count()}");
 
             // 获取es是否已经同步
             var versions = await this.GetVersionListAsync(dataList.Select(f => f.Id));
             var waitSyncIds = new List<string>();
             dataList.ToList().ForEach(f =>
             {
-                 if (versions.ContainsKey(f.Id))
-                 {
-                     // 版本相同情况下无需补偿
-                     if (versions[f.Id] >= f.Version)
-                         this._syncedMarkProcessor.MarkSynced(f.Id);
-                     else
-                         waitSyncIds.Add(f.Id);
-                 }
-             });
+                if (versions.ContainsKey(f.Id))
+                {
+                    // 版本相同情况下无需补偿
+                    if (versions[f.Id] >= f.Version)
+                        this._syncedMarkProcessor.MarkSynced(f.Id);
+                    else
+                        waitSyncIds.Add(f.Id);
+                }
+            });
 
             // 获取所有待补偿的数据
             if (waitSyncIds.Count > 0)
             {
                 var models = await storage.GetListAsync(waitSyncIds);
-                if(models!=null && models.Count() > 0)
+                if (models != null && models.Count() > 0)
                 {
                     await this.IndexManyAsync(models);
                 }
             }
             // 等待全部标记完成
             await this._syncedMarkProcessor.WaitMarkComplete();
-            return waitSyncIds.Count();
+            this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {waitSyncIds.Count()} count data");
 
+            //Returns whether processing has been completed
+            return dataList.Count() < this._options.CompleteCheckOnceCount;
         }
 
         public virtual Task<IDictionary<string, long>> GetVersionListAsync(IEnumerable<string> ids)

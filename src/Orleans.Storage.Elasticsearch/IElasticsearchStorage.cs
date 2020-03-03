@@ -33,6 +33,10 @@ namespace Orleans.Storage.Elasticsearch
 
         Task<bool> RefreshAsync(string id);
         Task<object> GetToDbAsync(string Id);
-        Task<int> CompensateSync();
+        /// <summary>
+        /// Compensate Sync
+        /// </summary>
+        /// <returns>Returns whether processing has been completed</returns>
+        Task<bool> CompensateSync();
     }
 }

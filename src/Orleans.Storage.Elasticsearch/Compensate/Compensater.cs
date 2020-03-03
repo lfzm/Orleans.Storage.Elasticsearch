@@ -80,11 +80,11 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             if (!_storageInfo.Compensate)
                 return;
             this._logger.LogDebug($"Start sanity check: {this._storageInfo.IndexName}");
-            int count = 0;
+            var compensateComplete = false;
             Stopwatch watch = new Stopwatch();
             watch.Start();
             // 循环到所有数据全部完成
-            while (count > int.MinValue)
+            while (compensateComplete == false)
             {
                 // 执行时间超过30分钟，暂停检查
                 if (watch.Elapsed >= _options.CompleteCheckTimeOut)
@@ -95,11 +95,9 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 try
                 {
                     var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
-                    count = await _storage.CompensateSync();
-                    if (count == int.MinValue)
-                        return;
-                    this._logger.LogInformation($"{this._storageInfo.IndexName} completa check synced {count} count data");
-                    await Task.Delay(100);
+                    compensateComplete = await _storage.CompensateSync();
+                    if (!compensateComplete)
+                        await Task.Delay(100);
                 }
                 catch (Exception ex)
                 {
