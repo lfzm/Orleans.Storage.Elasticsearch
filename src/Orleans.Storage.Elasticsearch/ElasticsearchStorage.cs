@@ -18,9 +18,9 @@ namespace Orleans.Storage.Elasticsearch
     public class ElasticsearchStorage<TModel> : IElasticsearchStorage<TModel>
         where TModel : class, IElasticsearchModel
     {
+        protected ILogger _logger;
         private readonly IElasticsearchClient<TModel> _client;
         private readonly IDataflowBufferBlock<TModel> _dataflowBuffer;
-        private readonly ILogger _logger;
         protected readonly IServiceProvider ServiceProvider;
         protected readonly ElasticsearchStorageInfo _storageInfo;
         protected readonly ISyncedStatusMarkProcessor _syncedMarkProcessor;
@@ -165,8 +165,8 @@ namespace Orleans.Storage.Elasticsearch
             if (reminderTable != null)
             {
                 await this.ServiceProvider.GetRequiredService<IGrainFactory>()
-                         .GetGrain<ICompensater>(this._storageInfo.IndexName)
-                         .CompensateAsync(new CompensateData(id, type));
+                         .GetGrain<ICompensater>(this._storageInfo.IndexName + $"+{id}")
+                         .CompensateAsync(new CompensateData(id, type, this._storageInfo.IndexName));
             }
         }
         public async Task<bool> RefreshAsync(string id)

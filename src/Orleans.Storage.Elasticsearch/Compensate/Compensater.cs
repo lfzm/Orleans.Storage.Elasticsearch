@@ -11,46 +11,46 @@ namespace Orleans.Storage.Elasticsearch.Compensate
     {
         private const string COMPLETECHECK = "CompleteCheck";
         private readonly ILogger _logger;
+        private IGrainReminder _reminder;
         private ElasticsearchStorageInfo _storageInfo;
-        private ElasticsearchStorageOptions _options;
         public Compensater(ILogger<Compensater> logger)
         {
             this._logger = logger;
         }
-        public override async Task OnActivateAsync()
-        {
-            this._storageInfo = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(this.GetPrimaryKeyString());
-            this._options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
-
-            if (_storageInfo.CompleteCheck)
-            {
-                // 定时检查数据完整度
-                TimeSpan dueTime = _storageInfo.CheckInterval;
-                if (_storageInfo.CheckStartTime > DateTime.Now)
-                    dueTime = _storageInfo.CheckStartTime - DateTime.Now;
-                this._logger.LogDebug($"{_storageInfo.IndexName} CheckStartTime:{_storageInfo.CheckStartTime} CheckInterval:{_storageInfo.CheckInterval} start complete check");
-                await this.RegisterOrUpdateReminder(COMPLETECHECK, dueTime, _storageInfo.CheckInterval);
-            }
-            await base.OnActivateAsync();
-        }
+   
         public async Task CompensateAsync(CompensateData data)
         {
+            this._storageInfo = this.GetElasticsearchStorageInfo(data.IndexName);
             await this.RegisterOrUpdateReminder(data.ToString(), TimeSpan.FromMinutes(1), TimeSpan.FromDays(1));
         }
-        public Task CompletaCheckAsync()
+
+        public async Task CompletaCheckAsync()
         {
-            return Task.CompletedTask;
+            if (_reminder != null)
+                return;
+            this._storageInfo = this.GetElasticsearchStorageInfo(this.GetPrimaryKeyString());
+            if (!_storageInfo.CompleteCheck)
+                return;
+            // 定时检查数据完整度
+            TimeSpan dueTime = _storageInfo.CheckInterval;
+            if (_storageInfo.CheckStartTime > DateTime.Now)
+                dueTime = _storageInfo.CheckStartTime - DateTime.Now;
+            this._logger.LogDebug($"{_storageInfo.IndexName} CheckStartTime:{_storageInfo.CheckStartTime} CheckInterval:{_storageInfo.CheckInterval} start complete check");
+            _reminder = await this.RegisterOrUpdateReminder(COMPLETECHECK, dueTime, _storageInfo.CheckInterval);
         }
+
         public async Task ReceiveReminder(string reminderName, TickStatus status)
         {
             if (reminderName.Equals(COMPLETECHECK))
                 await this.CheckCompleta();
             else
                 await this.Compensate(CompensateData.From(reminderName));
+            this.DeactivateOnIdle();
         }
         private async Task Compensate(CompensateData data)
         {
-          var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
+            var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>)
+                .MakeGenericType(_storageInfo.ModelType));
             this._logger.LogDebug($"Start data compensation: {data.ToString()}");
             if (data.Type == CompensateType.Clear)
             {
@@ -75,6 +75,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 await this.UnregisterReminder(reminder);
             }
         }
+
         private async Task CheckCompleta()
         {
             if (!_storageInfo.Compensate)
@@ -84,7 +85,9 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             Stopwatch watch = new Stopwatch();
             watch.Start();
             // 循环到所有数据全部完成
-            var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>).MakeGenericType(_storageInfo.ModelType));
+            var _options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
+            var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>)
+                .MakeGenericType(_storageInfo.ModelType));
             while (compensateComplete == false)
             {
                 // 执行时间超过30分钟，暂停检查
@@ -106,6 +109,11 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                     break;
                 }
             }
+        }
+
+        private ElasticsearchStorageInfo GetElasticsearchStorageInfo(string indexName)
+        {
+            return this.ServiceProvider.GetOptionsByName<ElasticsearchStorageInfo>(indexName);
         }
     }
 }

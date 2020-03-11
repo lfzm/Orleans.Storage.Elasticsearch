@@ -11,12 +11,17 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         {
 
         }
+        public CompensateData(string id, CompensateType type,string indexName)
+        {
+            Id = id;
+            Type = type;
+            IndexName = indexName;
+        }
         public CompensateData(string id, CompensateType type)
         {
             Id = id;
             Type = type;
         }
-
         /// <summary>
         /// 唯一标识
         /// </summary>
@@ -29,7 +34,10 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         /// 补偿类型
         /// </summary>
         public CompensateType Type { get; set; }
-
+        /// <summary>
+        /// index name
+        /// </summary>
+        public string IndexName { get; set; }
         public override string ToString()
         {
             return $"{Id}|{(int)Type}";

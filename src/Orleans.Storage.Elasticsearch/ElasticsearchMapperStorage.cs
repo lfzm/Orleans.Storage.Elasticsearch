@@ -22,7 +22,6 @@ namespace Orleans.Storage.Elasticsearch
         private readonly IStorageDocumentConverter _documentConverter;
         private readonly IElasticsearchClient<TDocument> _client;
         private readonly IDataflowBufferBlock<ElasticsearchDocument<TDocument>> _dataflowBuffer;
-        private readonly ILogger _logger;
         public ElasticsearchStorage(IServiceProvider serviceProvider, string indexName, IElasticsearchClient<TDocument> client) : base(serviceProvider, indexName)
         {
             this._client = client;
