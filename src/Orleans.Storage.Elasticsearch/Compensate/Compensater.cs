@@ -17,7 +17,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         {
             this._logger = logger;
         }
-   
+
         public async Task CompensateAsync(CompensateData data)
         {
             this._storageInfo = this.GetElasticsearchStorageInfo(data.IndexName);
@@ -78,9 +78,10 @@ namespace Orleans.Storage.Elasticsearch.Compensate
 
         private async Task CheckCompleta()
         {
+            this._storageInfo = this.GetElasticsearchStorageInfo(this.GetPrimaryKeyString());
             if (!_storageInfo.Compensate)
                 return;
-            this._logger.LogDebug($"Start sanity check: {this._storageInfo.IndexName}");
+            this._logger.LogDebug($"Start sanity check: {_storageInfo.IndexName}");
             var compensateComplete = false;
             Stopwatch watch = new Stopwatch();
             watch.Start();
@@ -105,7 +106,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                 catch (Exception ex)
                 {
                     watch.Stop();
-                    this._logger.LogError(ex, $"{this._storageInfo.IndexName} completa check failed");
+                    this._logger.LogError(ex, $"{_storageInfo.IndexName} completa check failed");
                     break;
                 }
             }
