@@ -179,7 +179,7 @@ namespace Orleans.Storage.Elasticsearch
         }
         public async Task<object> GetToDbAsync(string Id)
         {
-            var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
+            using var storage = this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
             return await storage.GetAsync(Id);
         }
         public async Task<bool> CompensateSync()
@@ -188,7 +188,7 @@ namespace Orleans.Storage.Elasticsearch
                 throw new Exception($"The {nameof(TModel)}  must implement the Orleans.Storage.Elasticsearch.Compensate.ICompensateStorage<{nameof(TModel)} > repository.");
 
             // 调用补偿仓储获取
-            var storage = (ICompensateCheckStorage<TModel>)this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
+            using var storage = (ICompensateCheckStorage<TModel>)this.ServiceProvider.GetRequiredService<ICompensateStorage<TModel>>();
             var dataList = await storage.GetWaitingSyncAsync(this._options.CompleteCheckOnceCount);
             if (dataList == null || dataList.Count() == 0)
                 return true;

@@ -56,7 +56,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                         if (ids.Count >= _options.MarkProcessMaxCount)
                             break;
                     }
-                    var storage = (ICompensateCheckStorage)this._serviceProvider.GetRequiredService(typeof(ICompensateStorage<>).MakeGenericType(_storageInfo.ModelType));
+                    using var storage = (ICompensateCheckStorage)this._serviceProvider.GetRequiredService(typeof(ICompensateStorage<>).MakeGenericType(_storageInfo.ModelType));
                     await storage.ModifySyncedStatus(ids);
                     await Task.Delay(1);
                     this.lastMarkTime = DateTime.Now;

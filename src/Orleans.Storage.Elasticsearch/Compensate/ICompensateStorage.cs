@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Storage.Elasticsearch.Compensate
@@ -9,14 +10,14 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         Task<IEnumerable<TModel>> GetListAsync(IEnumerable<string> ids);
     }
 
-    public interface ICompensateCheckStorage
+    public interface ICompensateCheckStorage : IDisposable
     {
         Task ModifySyncedStatus(IEnumerable<string> ids);
 
         Task<IEnumerable<CompensateData>> GetWaitingSyncAsync(int size);
     }
 
-    public interface ICompensateStorage<TModel>
+    public interface ICompensateStorage<TModel>: IDisposable
           where TModel : IElasticsearchModel
     {
         Task<TModel> GetAsync(string id);

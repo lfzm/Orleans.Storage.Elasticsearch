@@ -102,6 +102,8 @@ namespace Orleans.Storage.Elasticsearch.Compensate
                     compensateComplete = await _storage.CompensateSync();
                     if (!compensateComplete)
                         await Task.Delay(100);
+                    else
+                        watch.Stop();
                 }
                 catch (Exception ex)
                 {
