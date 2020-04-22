@@ -44,11 +44,12 @@ namespace Orleans.Storage.Elasticsearch.Compensate
         {
             if (Interlocked.CompareExchange(ref isProcessing, 1, 0) == 1)
                 return;
+            var ids = new List<string>();
             while (idqueue.Count > 0)
             {
                 try
                 {
-                    List<string> ids = new List<string>();
+                    ids.Clear();
                     // 循环取出队列中的数据
                     while (idqueue.TryDequeue(out string id))
                     {

@@ -230,6 +230,11 @@ namespace Orleans.Storage.Elasticsearch
         {
             return this._client.GetVersionListAsync(ids);
         }
+
+        public void Dispose()
+        {
+           
+        }
     }
     public class ElasticsearchStorage
     {

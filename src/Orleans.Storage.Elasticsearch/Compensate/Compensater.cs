@@ -87,7 +87,7 @@ namespace Orleans.Storage.Elasticsearch.Compensate
             watch.Start();
             // 循环到所有数据全部完成
             var _options = this.ServiceProvider.GetOptionsByName<ElasticsearchStorageOptions>(_storageInfo.StorageName);
-            var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>)
+            using var _storage = (IElasticsearchStorage)this.ServiceProvider.GetRequiredService(typeof(IElasticsearchStorage<>)
                 .MakeGenericType(_storageInfo.ModelType));
             while (compensateComplete == false)
             {

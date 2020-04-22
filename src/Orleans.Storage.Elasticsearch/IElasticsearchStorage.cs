@@ -23,7 +23,7 @@ namespace Orleans.Storage.Elasticsearch
     /// Elasticsearch 存储器
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    public interface IElasticsearchStorage
+    public interface IElasticsearchStorage:IDisposable
     {
         Task<object> GetAsync(string id);
         Task<IEnumerable<object>> GetListAsync(IEnumerable<string> ids);

@@ -10,6 +10,11 @@ namespace Orleans.Storage.Elasticsearch.Test.Mapping
 {
     public class UserCompensateStorage : ICompensateStorage<UserModel>
     {
+        public void Dispose()
+        {
+            
+        }
+
         public Task<UserModel> GetAsync(string id)
         {
             throw new NotImplementedException();

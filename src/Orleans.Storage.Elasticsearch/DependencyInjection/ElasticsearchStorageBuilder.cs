@@ -129,17 +129,17 @@ namespace Orleans.Storage.Elasticsearch
             where TDocument : class
         {
             this.StorageInfoList.Add(new ElasticsearchStorageInfo(indexName, typeof(TDocument), typeof(TModel)));
-            this.Services.AddSingleton<IElasticsearchStorage<TModel>>((sp) =>
-           {
-               var client = sp.GetRequiredService<IElasticsearchClient<TDocument>>();
-               return new ElasticsearchStorage<TModel, TDocument>(sp, indexName, client);
-           });
+            this.Services.AddTransient<IElasticsearchStorage<TModel>>((sp) =>
+            {
+                var client = sp.GetRequiredService<IElasticsearchClient<TDocument>>();
+                return new ElasticsearchStorage<TModel, TDocument>(sp, indexName, client);
+            });
             this.Services.AddSingleton<IElasticsearchClient<TDocument>>((sp) =>
-           {
-               var client = sp.GetRequiredServiceByName<IElasticClient>(this.StorageName);
-               var typeName = this.GetIndexTypeName(typeof(TDocument));
-               return new ElasticsearchClient<TDocument>(sp, client, indexName, typeName);
-           });
+            {
+                var client = sp.GetRequiredServiceByName<IElasticClient>(this.StorageName);
+                var typeName = this.GetIndexTypeName(typeof(TDocument));
+                return new ElasticsearchClient<TDocument>(sp, client, indexName, typeName);
+            });
             return this;
         }
 
